@@ -7,6 +7,7 @@ export type GamePhase =
   | "game_over";
 
 export type HandType = "456" | "trips" | "pair" | "123" | "nothing";
+export type AbilityMode = "selected" | "random_turn";
 
 export interface RollResult {
   dice: [number, number, number];
@@ -26,6 +27,7 @@ export interface Player {
 export interface GameState {
   phase: GamePhase;
   roomId: string;
+  abilityMode: AbilityMode;
   players: Player[];
   bankerIndex: number;
   currentPlayerIndex: number;
@@ -35,10 +37,16 @@ export interface GameState {
   round: number;
   maxRounds: number;
   rollCountMap: Record<string, number>;
+  currentTurnAbilityMap: Record<string, string>;
 }
 
 export type ClientMessage =
-  | { type: "join"; nickname: string; abilityId: string }
+  | {
+      type: "join";
+      nickname: string;
+      abilityId: string;
+      abilityMode?: AbilityMode;
+    }
   | { type: "ready" }
   | { type: "roll" }
   | { type: "use_active_ability"; payload: { pinnedValue: number } }

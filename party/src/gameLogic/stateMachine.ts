@@ -1,4 +1,5 @@
 import {
+  ABILITIES,
   applyAbilityWeights,
   BASE_WEIGHTS,
   getAbility,
@@ -6,7 +7,13 @@ import {
 } from "./abilities";
 import { rollWithWeights } from "./diceRoller";
 import { evaluateHand } from "./handEvaluator";
-import type { ClientMessage, GameState, Player, RollResult } from "../types/game";
+import type {
+  AbilityMode,
+  ClientMessage,
+  GameState,
+  Player,
+  RollResult,
+} from "../types/game";
 
 const DEFAULT_MAX_ROUNDS = 5;
 const DEFAULT_MAX_ROLLS = 3;
@@ -15,6 +22,7 @@ export function createInitialState(roomId: string): GameState {
   return {
     phase: "lobby",
     roomId,
+    abilityMode: "selected",
     players: [],
     bankerIndex: 0,
     currentPlayerIndex: 0,
@@ -24,6 +32,7 @@ export function createInitialState(roomId: string): GameState {
     round: 1,
     maxRounds: DEFAULT_MAX_ROUNDS,
     rollCountMap: {},
+    currentTurnAbilityMap: {},
   };
 }
 
@@ -34,7 +43,13 @@ export function applyMessage(
 ): GameState {
   switch (msg.type) {
     case "join":
-      return joinGame(state, msg.nickname, msg.abilityId, senderId);
+      return joinGame(
+        state,
+        msg.nickname,
+        msg.abilityId,
+        senderId,
+        msg.abilityMode,
+      );
     case "ready":
       return markReady(state, senderId);
     case "roll":
@@ -72,6 +87,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
       bankerIndex: 0,
       currentPlayerIndex: 0,
       bankerRoll: null,
+      currentTurnAbilityMap: {},
     };
   }
 
@@ -91,10 +107,15 @@ function joinGame(
   nickname: string,
   abilityId: string,
   senderId: string,
+  abilityMode?: AbilityMode,
 ): GameState {
   const cleanNickname = nickname.trim().slice(0, 24) || "名無し";
   const ability = getAbility(abilityId);
   const existing = state.players.find((player) => player.id === senderId);
+  const nextAbilityMode =
+    state.players.length === 0 && isAbilityMode(abilityMode)
+      ? abilityMode
+      : state.abilityMode;
 
   if (existing) {
     return {
@@ -126,6 +147,7 @@ function joinGame(
 
   return {
     ...state,
+    abilityMode: nextAbilityMode,
     phase: "ability_select",
     players: [...state.players, player],
     scores: {
@@ -140,6 +162,10 @@ function joinGame(
 }
 
 function markReady(state: GameState, senderId: string): GameState {
+  if (state.phase === "game_over") {
+    return markRematchReady(state, senderId);
+  }
+
   if (state.phase !== "ability_select") {
     return state;
   }
@@ -152,7 +178,7 @@ function markReady(state: GameState, senderId: string): GameState {
     return resetRound({
       ...state,
       players,
-      phase: "banker_turn",
+      phase: "player_turn",
     });
   }
 
@@ -168,59 +194,68 @@ function rollForCurrentTurn(
     return state;
   }
 
-  const activePlayer = getActivePlayer(state);
+  let nextState = state;
+  const activePlayer = getActivePlayer(nextState);
   if (!activePlayer || activePlayer.id !== senderId) {
-    return state;
+    return nextState;
   }
 
+  nextState = ensureTurnAbility(nextState, activePlayer.id);
+  const abilityId = getEffectiveAbilityId(nextState, activePlayer);
   const isGodhandRoll = pinnedValue !== undefined;
-  if (isGodhandRoll && !canUseGodhand(activePlayer, pinnedValue)) {
-    return state;
+  if (isGodhandRoll && !canUseGodhand(activePlayer, abilityId, pinnedValue)) {
+    return nextState;
   }
 
-  const rollCount = (state.rollCountMap[senderId] ?? 0) + 1;
-  const maxRolls = getMaxRolls(activePlayer);
+  const rollCount = (nextState.rollCountMap[senderId] ?? 0) + 1;
+  const maxRolls = getMaxRolls(abilityId);
   if (rollCount > maxRolls) {
-    return state;
+    return nextState;
   }
 
-  const previousDice = getPreviousDice(state, activePlayer.id);
-  const roll = rollDiceForPlayer(activePlayer, rollCount, previousDice, pinnedValue);
-  const rollCountMap = { ...state.rollCountMap, [senderId]: rollCount };
-  const players = state.players.map((player) =>
+  const previousDice = getPreviousDice(nextState, activePlayer.id);
+  const roll = rollDiceForPlayer(
+    activePlayer,
+    abilityId,
+    rollCount,
+    previousDice,
+    pinnedValue,
+  );
+  const rollCountMap = { ...nextState.rollCountMap, [senderId]: rollCount };
+  const players = nextState.players.map((player) =>
     player.id === senderId && isGodhandRoll
       ? { ...player, abilityUsedThisRound: true }
       : player,
   );
 
-  if (state.phase === "banker_turn") {
-    const nextState = {
-      ...state,
+  if (nextState.phase === "banker_turn") {
+    const rolledState = {
+      ...nextState,
       players,
       bankerRoll: roll,
       rollCountMap,
     };
 
     if (!roll.isValid && rollCount < maxRolls) {
-      return nextState;
+      return rolledState;
     }
 
-    return advanceToFirstChild(nextState);
+    return finishRound(rolledState);
   }
 
-  const playerRolls = { ...state.playerRolls, [senderId]: roll };
-  const nextState = {
-    ...state,
+  const playerRolls = { ...nextState.playerRolls, [senderId]: roll };
+  const rolledState = {
+    ...nextState,
     players,
     playerRolls,
     rollCountMap,
   };
 
   if (!roll.isValid && rollCount < maxRolls) {
-    return nextState;
+    return rolledState;
   }
 
-  return advanceToNextChildOrResult(nextState);
+  return advanceToNextChildOrBanker(rolledState);
 }
 
 function startNextRound(state: GameState): GameState {
@@ -236,7 +271,7 @@ function startNextRound(state: GameState): GameState {
     ...state,
     round: state.round + 1,
     bankerIndex: (state.bankerIndex + 1) % state.players.length,
-    phase: "banker_turn",
+    phase: "player_turn",
   });
 }
 
@@ -244,30 +279,33 @@ function resetRound(state: GameState): GameState {
   const rollCountMap = Object.fromEntries(
     state.players.map((player) => [player.id, 0]),
   );
+  const currentPlayerIndex = nextPlayerIndex(state, state.bankerIndex);
 
-  return {
+  return ensureTurnAbility({
     ...state,
-    currentPlayerIndex: state.bankerIndex,
+    currentPlayerIndex,
     bankerRoll: null,
     playerRolls: {},
     rollCountMap,
+    currentTurnAbilityMap: {},
     players: state.players.map((player) => ({
       ...player,
       abilityUsedThisRound: false,
       isReady: true,
     })),
-  };
+  }, state.players[currentPlayerIndex]?.id);
 }
 
 function rollDiceForPlayer(
   player: Player,
+  abilityId: string,
   rollCount: number,
   previousDice?: [number, number, number],
   pinnedValue?: number,
 ): RollResult {
-  if (player.abilityId === "godhand" && pinnedValue !== undefined) {
+  if (abilityId === "godhand" && pinnedValue !== undefined) {
     const remainingWeights = applyAbilityWeights(
-      player.abilityId,
+      abilityId,
       BASE_WEIGHTS,
       {
         previousDice,
@@ -278,13 +316,25 @@ function rollDiceForPlayer(
     );
     const dice: [number, number, number] = [
       pinnedValue,
-      rollWithPlayerWeights(player, rollCount, previousDice, remainingWeights),
-      rollWithPlayerWeights(player, rollCount, previousDice, remainingWeights),
+      rollWithPlayerWeights(
+        player,
+        abilityId,
+        rollCount,
+        previousDice,
+        remainingWeights,
+      ),
+      rollWithPlayerWeights(
+        player,
+        abilityId,
+        rollCount,
+        previousDice,
+        remainingWeights,
+      ),
     ];
     return evaluateHand(shuffleDice(dice));
   }
 
-  const weights = applyAbilityWeights(player.abilityId, BASE_WEIGHTS, {
+  const weights = applyAbilityWeights(abilityId, BASE_WEIGHTS, {
     previousDice,
     rollCount,
     abilityUsedThisRound: player.abilityUsedThisRound,
@@ -299,14 +349,15 @@ function rollDiceForPlayer(
 
 function rollWithPlayerWeights(
   player: Player,
+  abilityId: string,
   rollCount: number,
   previousDice: [number, number, number] | undefined,
   base: DiceWeights,
 ): number {
   const weights =
-    player.abilityId === "godhand"
+    abilityId === "godhand"
       ? BASE_WEIGHTS
-      : applyAbilityWeights(player.abilityId, base, {
+      : applyAbilityWeights(abilityId, base, {
           previousDice,
           rollCount,
           abilityUsedThisRound: player.abilityUsedThisRound,
@@ -314,9 +365,13 @@ function rollWithPlayerWeights(
   return rollWithWeights(weights);
 }
 
-function canUseGodhand(player: Player, pinnedValue: number | undefined): boolean {
+function canUseGodhand(
+  player: Player,
+  abilityId: string,
+  pinnedValue: number | undefined,
+): boolean {
   return (
-    player.abilityId === "godhand" &&
+    abilityId === "godhand" &&
     !player.abilityUsedThisRound &&
     pinnedValue !== undefined &&
     Number.isInteger(pinnedValue) &&
@@ -325,10 +380,8 @@ function canUseGodhand(player: Player, pinnedValue: number | undefined): boolean
   );
 }
 
-function getMaxRolls(player: Player): number {
-  return player.abilityId === "double_chance"
-    ? DEFAULT_MAX_ROLLS + 1
-    : DEFAULT_MAX_ROLLS;
+function getMaxRolls(abilityId: string): number {
+  return abilityId === "double_chance" ? DEFAULT_MAX_ROLLS + 1 : DEFAULT_MAX_ROLLS;
 }
 
 function getActivePlayer(state: GameState): Player | undefined {
@@ -339,25 +392,23 @@ function getActivePlayer(state: GameState): Player | undefined {
   return state.players[state.currentPlayerIndex];
 }
 
-function advanceToFirstChild(state: GameState): GameState {
-  const nextIndex = nextPlayerIndex(state, state.bankerIndex);
-  return {
-    ...state,
-    phase: "player_turn",
-    currentPlayerIndex: nextIndex,
-  };
-}
-
-function advanceToNextChildOrResult(state: GameState): GameState {
+function advanceToNextChildOrBanker(state: GameState): GameState {
   const nextIndex = nextPlayerIndex(state, state.currentPlayerIndex);
   if (nextIndex === state.bankerIndex) {
-    return finishRound(state);
+    return ensureTurnAbility(
+      {
+        ...state,
+        phase: "banker_turn",
+        currentPlayerIndex: state.bankerIndex,
+      },
+      state.players[state.bankerIndex]?.id,
+    );
   }
 
-  return {
+  return ensureTurnAbility({
     ...state,
     currentPlayerIndex: nextIndex,
-  };
+  }, state.players[nextIndex]?.id);
 }
 
 function finishRound(state: GameState): GameState {
@@ -384,10 +435,15 @@ function finishRound(state: GameState): GameState {
     }
   }
 
+  const isGameOver = state.round >= state.maxRounds;
   return {
     ...state,
     scores,
-    phase: state.round >= state.maxRounds ? "game_over" : "round_result",
+    phase: isGameOver ? "game_over" : "round_result",
+    players: isGameOver
+      ? state.players.map((player) => ({ ...player, isReady: false }))
+      : state.players,
+    currentTurnAbilityMap: {},
   };
 }
 
@@ -457,4 +513,67 @@ function shuffleDice(dice: [number, number, number]): [number, number, number] {
 
 function clampIndex(index: number, length: number): number {
   return length === 0 ? 0 : Math.min(index, length - 1);
+}
+
+function markRematchReady(state: GameState, senderId: string): GameState {
+  const players = state.players.map((player) =>
+    player.id === senderId ? { ...player, isReady: true } : player,
+  );
+
+  if (players.length >= 2 && players.every((player) => player.isReady)) {
+    return {
+      ...state,
+      phase: "ability_select",
+      players: players.map((player) => ({
+        ...player,
+        abilityUsedThisRound: false,
+        isReady: false,
+      })),
+      bankerIndex: 0,
+      currentPlayerIndex: 0,
+      bankerRoll: null,
+      playerRolls: {},
+      scores: Object.fromEntries(players.map((player) => [player.id, 0])),
+      round: 1,
+      rollCountMap: Object.fromEntries(players.map((player) => [player.id, 0])),
+      currentTurnAbilityMap: {},
+    };
+  }
+
+  return { ...state, players };
+}
+
+function ensureTurnAbility(state: GameState, playerId?: string): GameState {
+  if (!playerId || state.abilityMode !== "random_turn") {
+    return state;
+  }
+
+  if (state.currentTurnAbilityMap[playerId]) {
+    return state;
+  }
+
+  return {
+    ...state,
+    currentTurnAbilityMap: {
+      ...state.currentTurnAbilityMap,
+      [playerId]: randomAbilityId(),
+    },
+  };
+}
+
+function getEffectiveAbilityId(state: GameState, player: Player): string {
+  if (state.abilityMode === "random_turn") {
+    return state.currentTurnAbilityMap[player.id] ?? player.abilityId;
+  }
+
+  return player.abilityId;
+}
+
+function randomAbilityId(): string {
+  const index = Math.floor(Math.random() * ABILITIES.length);
+  return ABILITIES[index]?.id ?? ABILITIES[0].id;
+}
+
+function isAbilityMode(value: unknown): value is AbilityMode {
+  return value === "selected" || value === "random_turn";
 }
