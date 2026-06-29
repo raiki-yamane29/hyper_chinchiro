@@ -5,6 +5,17 @@ import { DiceDisplay } from "./DiceDisplay";
 import { HandResult } from "./HandResult";
 import type { GameState, Player, RollResult } from "@/types/game";
 
+const abilityNames: Record<string, string> = {
+  trickster: "イカサマ師",
+  lucky_six: "ラッキーシックス",
+  all_high: "オールフォア",
+  no_one: "ピンゾロ封じ",
+  chaos: "カオスダイス",
+  mirror: "ミラーロール",
+  godhand: "神の一手",
+  double_chance: "ダブルチャンス",
+};
+
 interface GameBoardProps {
   state: GameState | null;
   self: Player | null;
@@ -28,20 +39,35 @@ export function GameBoard({
   const banker = state?.players[state.bankerIndex] ?? null;
   const activePlayer = state?.players[state.currentPlayerIndex] ?? null;
   const isMyTurn = Boolean(self && activePlayer?.id === self.id);
+  const activeAbilityId = self ? getEffectiveAbilityId(state, self) : null;
   const canRoll =
     Boolean(self) &&
     isMyTurn &&
     (state?.phase === "banker_turn" || state?.phase === "player_turn");
   const canUseGodhand =
-    canRoll && self?.abilityId === "godhand" && !self.abilityUsedThisRound;
+    canRoll && activeAbilityId === "godhand" && !self?.abilityUsedThisRound;
+  const isGameOver = state?.phase === "game_over";
 
   return (
-    <div className="min-h-80 border border-stone-300 bg-white p-5">
+    <div
+      className={[
+        "min-h-80 border bg-white p-5",
+        isMyTurn
+          ? "border-2 border-red-800 shadow-[0_0_0_4px_rgba(153,27,27,0.12)]"
+          : "border-stone-300",
+      ].join(" ")}
+    >
       <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-stone-600">
         <span>Phase: {state?.phase ?? "loading"}</span>
         <span>Round: {state ? `${state.round}/${state.maxRounds}` : "-"}</span>
         <span>親: {banker?.nickname ?? "-"}</span>
         <span>手番: {activePlayer?.nickname ?? "-"}</span>
+        {state?.abilityMode === "random_turn" && activePlayer && (
+          <span>
+            今の能力:{" "}
+            {abilityNames[getEffectiveAbilityId(state, activePlayer)] ?? "-"}
+          </span>
+        )}
       </div>
 
       {self && (
@@ -52,7 +78,7 @@ export function GameBoard({
             onClick={onReady}
             type="button"
           >
-            Ready
+            {isGameOver ? "再戦 Ready" : "Ready"}
           </button>
           <button
             className="h-10 bg-red-800 px-4 text-sm font-semibold text-white disabled:bg-stone-400"
@@ -101,20 +127,24 @@ export function GameBoard({
 
       <div className="grid gap-4">
         <RollPanel
+          isActive={activePlayer?.id === banker?.id}
+          isBanker
           player={banker}
           roll={state?.bankerRoll ?? null}
           rolling={lastRollPlayerId === banker?.id}
-          title="親の出目"
+          state={state}
         />
         {state?.players
           .filter((player) => player.id !== banker?.id)
           .map((player) => (
             <RollPanel
+              isActive={activePlayer?.id === player.id}
+              isBanker={false}
               key={player.id}
               player={player}
               roll={state.playerRolls[player.id] ?? null}
               rolling={lastRollPlayerId === player.id}
-              title={`${player.nickname} の出目`}
+              state={state}
             />
           ))}
       </div>
@@ -123,23 +153,37 @@ export function GameBoard({
 }
 
 function RollPanel({
-  title,
+  isActive,
+  isBanker,
   player,
   roll,
   rolling,
+  state,
 }: {
-  title: string;
+  isActive: boolean;
+  isBanker: boolean;
   player: Player | null;
   roll: RollResult | null;
   rolling: boolean;
+  state: GameState | null;
 }) {
+  const title = player
+    ? `${player.nickname}${isBanker ? "(親)" : ""} の出目`
+    : "出目";
+  const abilityId = player ? getEffectiveAbilityId(state, player) : null;
+
   return (
-    <section className="border border-stone-200 p-4">
+    <section
+      className={[
+        "border p-4",
+        isActive ? "border-red-800 bg-red-50" : "border-stone-200",
+      ].join(" ")}
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-stone-600">{title}</h2>
-        {player && (
+        <h2 className="text-sm font-semibold text-stone-700">{title}</h2>
+        {abilityId && (
           <span className="text-xs text-stone-500">
-            ability {player.abilityId}
+            ability {abilityNames[abilityId] ?? abilityId}
           </span>
         )}
       </div>
@@ -147,4 +191,15 @@ function RollPanel({
       <HandResult roll={roll} />
     </section>
   );
+}
+
+function getEffectiveAbilityId(
+  state: GameState | null,
+  player: Player,
+): string {
+  if (state?.abilityMode === "random_turn") {
+    return state.currentTurnAbilityMap[player.id] ?? player.abilityId;
+  }
+
+  return player.abilityId;
 }

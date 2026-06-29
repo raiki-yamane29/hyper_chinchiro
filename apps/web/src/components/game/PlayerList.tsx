@@ -2,6 +2,17 @@
 
 import type { GameState } from "@/types/game";
 
+const abilityNames: Record<string, string> = {
+  trickster: "イカサマ師",
+  lucky_six: "ラッキーシックス",
+  all_high: "オールフォア",
+  no_one: "ピンゾロ封じ",
+  chaos: "カオスダイス",
+  mirror: "ミラーロール",
+  godhand: "神の一手",
+  double_chance: "ダブルチャンス",
+};
+
 interface PlayerListProps {
   state: GameState | null;
   selfId?: string;
@@ -17,7 +28,12 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
           const isActive = index === state?.currentPlayerIndex;
           return (
             <div
-              className="grid gap-1 border-b border-stone-200 py-2 text-sm"
+              className={[
+                "grid gap-1 border-b py-2 text-sm",
+                isActive
+                  ? "border-red-300 bg-red-50 px-2"
+                  : "border-stone-200",
+              ].join(" ")}
               key={player.id}
             >
               <div className="flex items-center justify-between gap-3">
@@ -33,7 +49,11 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
                 {isBanker && <span>親</span>}
                 {isActive && <span>手番</span>}
                 <span>{player.isReady ? "ready" : "waiting"}</span>
-                <span>{player.abilityId}</span>
+                <span>
+                  {state?.abilityMode === "random_turn" ? "今: " : ""}
+                  {abilityNames[getEffectiveAbilityId(state, player.id, player.abilityId)] ??
+                    player.abilityId}
+                </span>
               </div>
             </div>
           );
@@ -44,4 +64,16 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
       </div>
     </aside>
   );
+}
+
+function getEffectiveAbilityId(
+  state: GameState | null,
+  playerId: string,
+  fallbackAbilityId: string,
+): string {
+  if (state?.abilityMode === "random_turn") {
+    return state.currentTurnAbilityMap[playerId] ?? fallbackAbilityId;
+  }
+
+  return fallbackAbilityId;
 }
