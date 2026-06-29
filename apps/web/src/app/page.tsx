@@ -1,64 +1,86 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { nanoid } from "nanoid";
 
 export default function Home() {
+  const router = useRouter();
+  const [nickname, setNickname] = useState("");
+  const [roomId, setRoomId] = useState("");
+
+  const goToRoom = (targetRoomId: string) => {
+    const params = new URLSearchParams();
+    if (nickname.trim()) {
+      params.set("nickname", nickname.trim());
+    }
+
+    const query = params.toString();
+    router.push(`/room/${targetRoomId}${query ? `?${query}` : ""}`);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-[#f7f2e8] text-stone-950">
+      <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center gap-8 px-4 py-10 sm:px-6">
+        <header className="space-y-3">
+          <p className="text-sm font-semibold uppercase tracking-normal text-red-800">
+            Realtime Dice Battle
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+          <h1 className="text-4xl font-bold tracking-normal sm:text-6xl">
+            Hyper Chinchiro
+          </h1>
+          <p className="max-w-2xl text-base leading-7 text-stone-700">
+            チンチロに特殊能力を加えたリアルタイム対戦ゲーム。
+          </p>
+        </header>
+
+        <section className="grid gap-4 border border-stone-300 bg-white p-5 shadow-sm">
+          <label className="grid gap-2 text-sm font-semibold">
+            ニックネーム
+            <input
+              className="h-12 border border-stone-300 px-3 text-base outline-none focus:border-red-700"
+              maxLength={24}
+              placeholder="例: yamane"
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <button
+              className="h-12 bg-red-800 px-5 font-semibold text-white disabled:bg-stone-400"
+              disabled={!nickname.trim()}
+              onClick={() => goToRoom(nanoid(8))}
+              type="button"
+            >
+              新規ルーム作成
+            </button>
+
+            <form
+              className="grid gap-3 sm:grid-cols-[180px_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (roomId.trim()) {
+                  goToRoom(roomId.trim());
+                }
+              }}
+            >
+              <input
+                className="h-12 border border-stone-300 px-3 text-base outline-none focus:border-red-700"
+                placeholder="roomId"
+                value={roomId}
+                onChange={(event) => setRoomId(event.target.value)}
+              />
+              <button
+                className="h-12 border border-stone-800 px-5 font-semibold disabled:border-stone-300 disabled:text-stone-400"
+                disabled={!nickname.trim() || !roomId.trim()}
+                type="submit"
+              >
+                参加
+              </button>
+            </form>
+          </div>
+        </section>
       </main>
     </div>
   );
