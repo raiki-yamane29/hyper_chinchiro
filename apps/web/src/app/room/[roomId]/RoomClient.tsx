@@ -7,6 +7,7 @@ import { GameBoard } from "@/components/game/GameBoard";
 import { PlayerList } from "@/components/game/PlayerList";
 import { useGameState } from "@/hooks/useGameState";
 import { usePartySocket } from "@/hooks/usePartySocket";
+import type { AbilityMode } from "@/types/game";
 
 interface RoomClientProps {
   roomId: string;
@@ -16,6 +17,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const searchParams = useSearchParams();
   const initialNickname = searchParams.get("nickname") ?? "";
   const initialAbility = searchParams.get("abilityId") ?? "trickster";
+  const abilityMode = parseAbilityMode(searchParams.get("abilityMode"));
   const [nickname, setNickname] = useState(initialNickname);
   const [abilityId, setAbilityId] = useState(initialAbility);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
@@ -86,7 +88,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
             className="grid gap-4 border border-stone-300 bg-white p-4 shadow-sm"
             onSubmit={(event) => {
               event.preventDefault();
-              send({ type: "join", nickname, abilityId });
+              send({ type: "join", nickname, abilityId, abilityMode });
             }}
           >
             <div className="grid gap-4 md:grid-cols-[minmax(220px,0.7fr)_1.3fr]">
@@ -115,6 +117,12 @@ export function RoomClient({ roomId }: RoomClientProps) {
         )}
 
         {error && <p className="text-sm font-medium text-red-800">{error}</p>}
+        <p className="text-sm text-stone-600">
+          能力モード:{" "}
+          {state?.abilityMode === "random_turn"
+            ? "毎ターンランダム"
+            : "選択固定"}
+        </p>
 
         <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <GameBoard
@@ -157,4 +165,8 @@ async function copyText(text: string) {
   } finally {
     document.body.removeChild(textarea);
   }
+}
+
+function parseAbilityMode(value: string | null): AbilityMode {
+  return value === "random_turn" ? "random_turn" : "selected";
 }

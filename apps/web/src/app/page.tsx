@@ -8,11 +8,15 @@ export default function Home() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [randomAbilityMode, setRandomAbilityMode] = useState(false);
 
   const goToRoom = (targetRoomId: string) => {
     const params = new URLSearchParams();
     if (nickname.trim()) {
       params.set("nickname", nickname.trim());
+    }
+    if (randomAbilityMode) {
+      params.set("abilityMode", "random_turn");
     }
 
     const query = params.toString();
@@ -40,10 +44,20 @@ export default function Home() {
             <input
               className="h-12 border border-stone-300 px-3 text-base outline-none focus:border-red-700"
               maxLength={24}
-              placeholder="例: yamane"
+              placeholder="例: yamada"
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
             />
+          </label>
+
+          <label className="flex items-center gap-3 border border-stone-300 bg-[#fffaf0] p-3 text-sm font-semibold">
+            <input
+              checked={randomAbilityMode}
+              className="size-4 accent-red-800"
+              onChange={(event) => setRandomAbilityMode(event.target.checked)}
+              type="checkbox"
+            />
+            毎ターン能力をランダムに決定
           </label>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
