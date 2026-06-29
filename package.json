@@ -1,0 +1,16 @@
+{
+  "name": "hyper-chinchiro",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "party"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/web\" \"npm run dev -w party\"",
+    "build": "npm run build -w apps/web",
+    "lint": "npm run lint -w apps/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

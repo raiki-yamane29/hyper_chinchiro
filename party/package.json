@@ -1,0 +1,17 @@
+{
+  "name": "party",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "partykit dev",
+    "deploy": "partykit deploy"
+  },
+  "dependencies": {
+    "partykit": "^0.0.107",
+    "partysocket": "^1.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
