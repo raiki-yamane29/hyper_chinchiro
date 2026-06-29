@@ -340,7 +340,7 @@ function getActivePlayer(state: GameState): Player | undefined {
 }
 
 function advanceToFirstChild(state: GameState): GameState {
-  const nextIndex = nextChildIndex(state, state.bankerIndex);
+  const nextIndex = nextPlayerIndex(state, state.bankerIndex);
   return {
     ...state,
     phase: "player_turn",
@@ -349,7 +349,7 @@ function advanceToFirstChild(state: GameState): GameState {
 }
 
 function advanceToNextChildOrResult(state: GameState): GameState {
-  const nextIndex = nextChildIndex(state, state.currentPlayerIndex);
+  const nextIndex = nextPlayerIndex(state, state.currentPlayerIndex);
   if (nextIndex === state.bankerIndex) {
     return finishRound(state);
   }
@@ -420,16 +420,12 @@ function compareRolls(
   return "draw";
 }
 
-function nextChildIndex(state: GameState, fromIndex: number): number {
+function nextPlayerIndex(state: GameState, fromIndex: number): number {
   if (state.players.length <= 1) {
     return state.bankerIndex;
   }
 
-  let index = fromIndex;
-  do {
-    index = (index + 1) % state.players.length;
-  } while (index === state.bankerIndex);
-  return index;
+  return (fromIndex + 1) % state.players.length;
 }
 
 function getPreviousDice(
