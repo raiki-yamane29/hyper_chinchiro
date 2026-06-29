@@ -25,6 +25,10 @@ export function RoomClient({ roomId }: RoomClientProps) {
   );
   const { socket, status } = usePartySocket({ roomId });
   const { state, lastRoll, error, send } = useGameState(socket);
+  const effectiveAbilityMode =
+    state?.abilityMode === "random_turn" || abilityMode === "random_turn"
+      ? "random_turn"
+      : "selected";
 
   const me = useMemo(() => {
     if (!state || !socket) {
@@ -88,10 +92,22 @@ export function RoomClient({ roomId }: RoomClientProps) {
             className="grid gap-4 border border-stone-300 bg-white p-4 shadow-sm"
             onSubmit={(event) => {
               event.preventDefault();
-              send({ type: "join", nickname, abilityId, abilityMode });
+              send({
+                type: "join",
+                nickname,
+                abilityId,
+                abilityMode: effectiveAbilityMode,
+              });
             }}
           >
-            <div className="grid gap-4 md:grid-cols-[minmax(220px,0.7fr)_1.3fr]">
+            <div
+              className={[
+                "grid gap-4",
+                effectiveAbilityMode === "selected"
+                  ? "md:grid-cols-[minmax(220px,0.7fr)_1.3fr]"
+                  : "",
+              ].join(" ")}
+            >
               <label className="grid content-start gap-2 text-sm font-medium">
                 ニックネーム
                 <input
@@ -102,7 +118,16 @@ export function RoomClient({ roomId }: RoomClientProps) {
                   onChange={(event) => setNickname(event.target.value)}
                 />
               </label>
-              <AbilitySelector value={abilityId} onChange={setAbilityId} />
+              {effectiveAbilityMode === "selected" ? (
+                <AbilitySelector value={abilityId} onChange={setAbilityId} />
+              ) : (
+                <div className="grid content-start gap-2 border border-red-200 bg-red-50 p-4 text-sm">
+                  <span className="font-semibold">毎ターンランダム能力</span>
+                  <span className="leading-6 text-stone-700">
+                    このルームでは手番ごとに能力が自動で決まります。
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex justify-end">
               <button
@@ -119,7 +144,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
         {error && <p className="text-sm font-medium text-red-800">{error}</p>}
         <p className="text-sm text-stone-600">
           能力モード:{" "}
-          {state?.abilityMode === "random_turn"
+          {effectiveAbilityMode === "random_turn"
             ? "毎ターンランダム"
             : "選択固定"}
         </p>
