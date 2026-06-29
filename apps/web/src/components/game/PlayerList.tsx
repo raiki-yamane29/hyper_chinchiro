@@ -26,6 +26,11 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
         {(state?.players ?? []).map((player, index) => {
           const isBanker = index === state?.bankerIndex;
           const isActive = index === state?.currentPlayerIndex;
+          const abilityId = getEffectiveAbilityId(
+            state,
+            player.id,
+            player.abilityId,
+          );
           return (
             <div
               className={[
@@ -49,11 +54,12 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
                 {isBanker && <span>親</span>}
                 {isActive && <span>手番</span>}
                 <span>{player.isReady ? "ready" : "waiting"}</span>
-                <span>
-                  {state?.abilityMode === "random_turn" ? "今: " : ""}
-                  {abilityNames[getEffectiveAbilityId(state, player.id, player.abilityId)] ??
-                    player.abilityId}
-                </span>
+                {abilityId && (
+                  <span>
+                    {state?.abilityMode === "random_turn" ? "今: " : ""}
+                    {abilityNames[abilityId] ?? abilityId}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -70,9 +76,9 @@ function getEffectiveAbilityId(
   state: GameState | null,
   playerId: string,
   fallbackAbilityId: string,
-): string {
+): string | null {
   if (state?.abilityMode === "random_turn") {
-    return state.currentTurnAbilityMap[playerId] ?? fallbackAbilityId;
+    return state.currentTurnAbilityMap[playerId] ?? null;
   }
 
   return fallbackAbilityId;
