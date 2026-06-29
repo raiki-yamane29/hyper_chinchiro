@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AbilitySelector } from "@/components/lobby/AbilitySelector";
 import { GameBoard } from "@/components/game/GameBoard";
@@ -18,6 +18,9 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const initialAbility = searchParams.get("abilityId") ?? "trickster";
   const [nickname, setNickname] = useState(initialNickname);
   const [abilityId, setAbilityId] = useState(initialAbility);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   const { socket, status } = usePartySocket({ roomId });
   const { state, lastRoll, error, send } = useGameState(socket);
 
@@ -29,15 +32,53 @@ export function RoomClient({ roomId }: RoomClientProps) {
     return state.players.find((player) => player.id === socket.id) ?? null;
   }, [socket, state]);
 
+  useEffect(() => {
+    if (copyState === "idle") {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setCopyState("idle"), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [copyState]);
+
+  const copyRoomId = async () => {
+    try {
+      await copyText(roomId);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f2e8] text-stone-950">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-        <header className="flex flex-col gap-2 border-b border-stone-300 pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <header className="flex flex-col gap-4 border-b border-stone-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-red-800">Room {roomId}</p>
             <h1 className="text-3xl font-bold tracking-normal">Hyper Chinchiro</h1>
+            <p className="mt-1 text-sm text-stone-600">接続: {status}</p>
           </div>
-          <span className="text-sm text-stone-600">接続: {status}</span>
+          <div className="grid gap-2 border-2 border-red-800 bg-white p-3 shadow-sm sm:min-w-80">
+            <span className="text-xs font-bold uppercase tracking-normal text-red-800">
+              Room ID
+            </span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <code className="select-all break-all font-mono text-2xl font-bold text-stone-950">
+                {roomId}
+              </code>
+              <button
+                className="h-10 shrink-0 bg-red-800 px-4 text-sm font-semibold text-white"
+                onClick={copyRoomId}
+                type="button"
+              >
+                {copyState === "copied"
+                  ? "コピー済み"
+                  : copyState === "failed"
+                    ? "失敗"
+                    : "コピー"}
+              </button>
+            </div>
+          </div>
         </header>
 
         {!me && (
@@ -92,4 +133,28 @@ export function RoomClient({ roomId }: RoomClientProps) {
       </div>
     </main>
   );
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("copy failed");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }
