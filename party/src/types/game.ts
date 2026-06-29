@@ -16,6 +16,16 @@ export interface RollResult {
   isValid: boolean;
 }
 
+export interface RoundSettlement {
+  bankerId: string;
+  playerId: string;
+  winnerId: string;
+  bankerDelta: number;
+  playerDelta: number;
+  points: number;
+  reason: string;
+}
+
 export interface Player {
   id: string;
   nickname: string;
@@ -33,6 +43,7 @@ export interface GameState {
   currentPlayerIndex: number;
   bankerRoll: RollResult | null;
   playerRolls: Record<string, RollResult>;
+  roundSettlements: Record<string, RoundSettlement>;
   scores: Record<string, number>;
   round: number;
   maxRounds: number;

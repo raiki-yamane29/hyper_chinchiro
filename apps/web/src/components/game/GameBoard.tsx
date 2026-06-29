@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { DiceDisplay } from "./DiceDisplay";
 import { HandResult } from "./HandResult";
-import type { GameState, Player, RollResult } from "@/types/game";
+import type {
+  GameState,
+  Player,
+  RollResult,
+  RoundSettlement,
+} from "@/types/game";
 
 const abilityNames: Record<string, string> = {
   trickster: "イカサマ師",
@@ -61,6 +66,12 @@ export function GameBoard({
   const canUseGodhand =
     canRoll && activeAbilityId === "godhand" && !self?.abilityUsedThisRound;
   const isGameOver = state?.phase === "game_over";
+  const bankerRoundDelta = banker
+    ? Object.values(state?.roundSettlements ?? {}).reduce(
+        (total, settlement) => total + settlement.bankerDelta,
+        0,
+      )
+    : 0;
 
   return (
     <div
@@ -151,6 +162,14 @@ export function GameBoard({
           player={banker}
           roll={state?.bankerRoll ?? null}
           rolling={lastRollPlayerId === banker?.id}
+          settlementSummary={
+            state?.phase === "round_result" || state?.phase === "game_over"
+              ? {
+                  label: "ラウンド合計",
+                  delta: bankerRoundDelta,
+                }
+              : null
+          }
           state={state}
         />
         {state?.players
@@ -163,6 +182,7 @@ export function GameBoard({
               player={player}
               roll={state.playerRolls[player.id] ?? null}
               rolling={lastRollPlayerId === player.id}
+              settlement={state.roundSettlements[player.id] ?? null}
               state={state}
             />
           ))}
@@ -177,6 +197,8 @@ function RollPanel({
   player,
   roll,
   rolling,
+  settlement,
+  settlementSummary,
   state,
 }: {
   isActive: boolean;
@@ -184,6 +206,8 @@ function RollPanel({
   player: Player | null;
   roll: RollResult | null;
   rolling: boolean;
+  settlement?: RoundSettlement | null;
+  settlementSummary?: { label: string; delta: number } | null;
   state: GameState | null;
 }) {
   const title = player
@@ -206,9 +230,88 @@ function RollPanel({
           </span>
         )}
       </div>
-      <DiceDisplay dice={roll?.dice ?? null} rolling={rolling} />
-      <HandResult roll={roll} />
+      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <DiceDisplay dice={roll?.dice ?? null} rolling={rolling} />
+          <HandResult roll={roll} />
+        </div>
+        <SettlementDisplay
+          playerId={player?.id ?? null}
+          settlement={settlement}
+          summary={settlementSummary}
+        />
+      </div>
     </section>
+  );
+}
+
+function SettlementDisplay({
+  playerId,
+  settlement,
+  summary,
+}: {
+  playerId: string | null;
+  settlement?: RoundSettlement | null;
+  summary?: { label: string; delta: number } | null;
+}) {
+  if (summary) {
+    return (
+      <PointDeltaCard
+        delta={summary.delta}
+        label={summary.label}
+        reason={summary.delta === 0 ? "移動なし" : ""}
+      />
+    );
+  }
+
+  if (!settlement || !playerId) {
+    return null;
+  }
+
+  const delta =
+    playerId === settlement.bankerId
+      ? settlement.bankerDelta
+      : settlement.playerDelta;
+
+  return (
+    <PointDeltaCard
+      delta={delta}
+      label={delta >= 0 ? "獲得" : "支払い"}
+      reason={settlement.reason}
+    />
+  );
+}
+
+function PointDeltaCard({
+  delta,
+  label,
+  reason,
+}: {
+  delta: number;
+  label: string;
+  reason: string;
+}) {
+  const positive = delta > 0;
+  const neutral = delta === 0;
+
+  return (
+    <div
+      className={[
+        "grid min-w-32 gap-1 border p-3 text-right text-sm",
+        positive
+          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+          : neutral
+            ? "border-stone-200 bg-stone-50 text-stone-600"
+            : "border-red-300 bg-red-50 text-red-800",
+      ].join(" ")}
+    >
+      <span className="text-xs font-semibold">{label}</span>
+      <span className="text-2xl font-bold">
+        {delta > 0 ? "+" : ""}
+        {delta}pt
+      </span>
+      {reason && <span className="text-xs">{reason}</span>}
+    </div>
   );
 }
 

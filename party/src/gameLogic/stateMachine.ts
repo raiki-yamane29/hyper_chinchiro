@@ -12,6 +12,7 @@ import type {
   ClientMessage,
   GameState,
   Player,
+  RoundSettlement,
   RollResult,
 } from "../types/game";
 
@@ -28,6 +29,7 @@ export function createInitialState(roomId: string): GameState {
     currentPlayerIndex: 0,
     bankerRoll: null,
     playerRolls: {},
+    roundSettlements: {},
     scores: {},
     round: 1,
     maxRounds: DEFAULT_MAX_ROUNDS,
@@ -72,9 +74,11 @@ export function removePlayer(state: GameState, playerId: string): GameState {
   const scores = { ...state.scores };
   const rollCountMap = { ...state.rollCountMap };
   const playerRolls = { ...state.playerRolls };
+  const roundSettlements = { ...state.roundSettlements };
   delete scores[playerId];
   delete rollCountMap[playerId];
   delete playerRolls[playerId];
+  delete roundSettlements[playerId];
 
   if (players.length < 2) {
     return {
@@ -87,6 +91,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
       bankerIndex: 0,
       currentPlayerIndex: 0,
       bankerRoll: null,
+      roundSettlements,
       currentTurnAbilityMap: {},
     };
   }
@@ -97,6 +102,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
     scores,
     rollCountMap,
     playerRolls,
+    roundSettlements,
     bankerIndex: clampIndex(state.bankerIndex, players.length),
     currentPlayerIndex: clampIndex(state.currentPlayerIndex, players.length),
   };
@@ -286,6 +292,7 @@ function resetRound(state: GameState): GameState {
     currentPlayerIndex,
     bankerRoll: null,
     playerRolls: {},
+    roundSettlements: {},
     rollCountMap,
     currentTurnAbilityMap: {},
     players: state.players.map((player) => ({
@@ -418,6 +425,7 @@ function finishRound(state: GameState): GameState {
   }
 
   const scores = { ...state.scores };
+  const roundSettlements: Record<string, RoundSettlement> = {};
 
   for (const player of state.players) {
     if (player.id === banker.id) {
@@ -425,20 +433,22 @@ function finishRound(state: GameState): GameState {
     }
 
     const playerRoll = state.playerRolls[player.id];
-    const winner = compareRolls(state.bankerRoll, playerRoll);
-    if (winner === "banker") {
-      scores[banker.id] = (scores[banker.id] ?? 0) + 1;
-      scores[player.id] = (scores[player.id] ?? 0) - 1;
-    } else if (winner === "player") {
-      scores[player.id] = (scores[player.id] ?? 0) + 2;
-      scores[banker.id] = (scores[banker.id] ?? 0) - 1;
-    }
+    const settlement = createSettlement(
+      banker,
+      player,
+      state.bankerRoll,
+      playerRoll,
+    );
+    scores[banker.id] = (scores[banker.id] ?? 0) + settlement.bankerDelta;
+    scores[player.id] = (scores[player.id] ?? 0) + settlement.playerDelta;
+    roundSettlements[player.id] = settlement;
   }
 
   const isGameOver = state.round >= state.maxRounds;
   return {
     ...state,
     scores,
+    roundSettlements,
     phase: isGameOver ? "game_over" : "round_result",
     players: isGameOver
       ? state.players.map((player) => ({ ...player, isReady: false }))
@@ -450,7 +460,7 @@ function finishRound(state: GameState): GameState {
 function compareRolls(
   bankerRoll: RollResult,
   playerRoll: RollResult | undefined,
-): "banker" | "player" | "draw" {
+): "banker" | "player" {
   if (!playerRoll) {
     return "banker";
   }
@@ -473,7 +483,83 @@ function compareRolls(
   if (playerRoll.handValue > bankerRoll.handValue) {
     return "player";
   }
-  return "draw";
+  return "banker";
+}
+
+function createSettlement(
+  banker: Player,
+  player: Player,
+  bankerRoll: RollResult,
+  playerRoll: RollResult | undefined,
+): RoundSettlement {
+  const winner = compareRolls(bankerRoll, playerRoll);
+  const winnerId = winner === "player" ? player.id : banker.id;
+  const winnerRoll = winner === "player" ? playerRoll : bankerRoll;
+  const loserRoll = winner === "player" ? bankerRoll : playerRoll;
+  const { points, reason } = getSettlementPoints(winnerRoll, loserRoll);
+  const bankerDelta = winner === "banker" ? points : -points;
+  const playerDelta = winner === "player" ? points : -points;
+
+  return {
+    bankerId: banker.id,
+    playerId: player.id,
+    winnerId,
+    bankerDelta,
+    playerDelta,
+    points,
+    reason,
+  };
+}
+
+function getSettlementPoints(
+  winnerRoll: RollResult | undefined,
+  loserRoll: RollResult | undefined,
+): { points: number; reason: string } {
+  const multiplier = Math.max(
+    getWinnerMultiplier(winnerRoll),
+    loserRoll?.hand === "123" ? 2 : 1,
+  );
+
+  if (
+    winnerRoll?.hand === "trips" &&
+    winnerRoll.dice.every((value) => value === 1)
+  ) {
+    return { points: 5, reason: "ピンゾロ 5倍" };
+  }
+
+  if (winnerRoll?.hand === "trips") {
+    return { points: multiplier, reason: "ゾロ目 3倍" };
+  }
+
+  if (winnerRoll?.hand === "456") {
+    return { points: multiplier, reason: "あらし 2倍" };
+  }
+
+  if (loserRoll?.hand === "123") {
+    return { points: multiplier, reason: "ヒフミ -2倍" };
+  }
+
+  return { points: 1, reason: "通常 1pt" };
+}
+
+function getWinnerMultiplier(roll: RollResult | undefined): number {
+  if (!roll) {
+    return 1;
+  }
+
+  if (roll.hand === "trips" && roll.dice.every((value) => value === 1)) {
+    return 5;
+  }
+
+  if (roll.hand === "trips") {
+    return 3;
+  }
+
+  if (roll.hand === "456") {
+    return 2;
+  }
+
+  return 1;
 }
 
 function nextPlayerIndex(state: GameState, fromIndex: number): number {
@@ -533,6 +619,7 @@ function markRematchReady(state: GameState, senderId: string): GameState {
       currentPlayerIndex: 0,
       bankerRoll: null,
       playerRolls: {},
+      roundSettlements: {},
       scores: Object.fromEntries(players.map((player) => [player.id, 0])),
       round: 1,
       rollCountMap: Object.fromEntries(players.map((player) => [player.id, 0])),
