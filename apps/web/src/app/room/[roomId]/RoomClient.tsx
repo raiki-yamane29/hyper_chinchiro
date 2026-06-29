@@ -81,6 +81,9 @@ export function RoomClient({ roomId }: RoomClientProps) {
             onNextRound={() => send({ type: "next_round" })}
             onReady={() => send({ type: "ready" })}
             onRoll={() => send({ type: "roll" })}
+            onUseGodhand={(pinnedValue) =>
+              send({ type: "use_active_ability", payload: { pinnedValue } })
+            }
             self={me}
             state={state}
           />

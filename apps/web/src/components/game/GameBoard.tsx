@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { DiceDisplay } from "./DiceDisplay";
 import { HandResult } from "./HandResult";
 import type { GameState, Player, RollResult } from "@/types/game";
@@ -10,6 +11,7 @@ interface GameBoardProps {
   lastRollPlayerId?: string;
   onReady: () => void;
   onRoll: () => void;
+  onUseGodhand: (pinnedValue: number) => void;
   onNextRound: () => void;
 }
 
@@ -19,8 +21,10 @@ export function GameBoard({
   lastRollPlayerId,
   onReady,
   onRoll,
+  onUseGodhand,
   onNextRound,
 }: GameBoardProps) {
+  const [pinnedValue, setPinnedValue] = useState(6);
   const banker = state?.players[state.bankerIndex] ?? null;
   const activePlayer = state?.players[state.currentPlayerIndex] ?? null;
   const isMyTurn = Boolean(self && activePlayer?.id === self.id);
@@ -28,6 +32,8 @@ export function GameBoard({
     Boolean(self) &&
     isMyTurn &&
     (state?.phase === "banker_turn" || state?.phase === "player_turn");
+  const canUseGodhand =
+    canRoll && self?.abilityId === "godhand" && !self.abilityUsedThisRound;
 
   return (
     <div className="min-h-80 border border-stone-300 bg-white p-5">
@@ -63,6 +69,32 @@ export function GameBoard({
             type="button"
           >
             次ラウンド
+          </button>
+        </div>
+      )}
+
+      {canUseGodhand && (
+        <div className="mb-5 grid gap-3 border border-red-200 bg-red-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="grid gap-2 text-sm font-semibold">
+            神の一手
+            <select
+              className="h-10 border border-red-200 bg-white px-3 text-base outline-none focus:border-red-700"
+              onChange={(event) => setPinnedValue(Number(event.target.value))}
+              value={pinnedValue}
+            >
+              {[1, 2, 3, 4, 5, 6].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="h-10 bg-red-800 px-4 text-sm font-semibold text-white"
+            onClick={() => onUseGodhand(pinnedValue)}
+            type="button"
+          >
+            固定して振る
           </button>
         </div>
       )}
