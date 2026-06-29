@@ -17,18 +17,19 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const searchParams = useSearchParams();
   const initialNickname = searchParams.get("nickname") ?? "";
   const initialAbility = searchParams.get("abilityId") ?? "trickster";
-  const abilityMode = parseAbilityMode(searchParams.get("abilityMode"));
   const [nickname, setNickname] = useState(initialNickname);
   const [abilityId, setAbilityId] = useState(initialAbility);
+  const [selectedAbilityMode, setSelectedAbilityMode] =
+    useState<AbilityMode>("random_turn");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
   const { socket, status } = usePartySocket({ roomId });
   const { state, lastRoll, error, send } = useGameState(socket);
-  const effectiveAbilityMode =
-    state?.abilityMode === "random_turn" || abilityMode === "random_turn"
-      ? "random_turn"
-      : "selected";
+  const roomHasPlayers = Boolean(state?.players.length);
+  const effectiveAbilityMode = roomHasPlayers
+    ? (state?.abilityMode ?? "random_turn")
+    : selectedAbilityMode;
 
   const me = useMemo(() => {
     if (!state || !socket) {
@@ -118,6 +119,51 @@ export function RoomClient({ roomId }: RoomClientProps) {
                   onChange={(event) => setNickname(event.target.value)}
                 />
               </label>
+              <fieldset className="grid content-start gap-2 text-sm font-medium">
+                <legend>能力モード</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <label
+                    className={[
+                      "cursor-pointer border p-3",
+                      effectiveAbilityMode === "random_turn"
+                        ? "border-red-800 bg-red-50"
+                        : "border-stone-300 bg-white",
+                      roomHasPlayers ? "cursor-not-allowed opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    <input
+                      checked={effectiveAbilityMode === "random_turn"}
+                      className="sr-only"
+                      disabled={roomHasPlayers}
+                      name="abilityMode"
+                      onChange={() => setSelectedAbilityMode("random_turn")}
+                      type="radio"
+                      value="random_turn"
+                    />
+                    <span className="font-semibold">ランダム</span>
+                  </label>
+                  <label
+                    className={[
+                      "cursor-pointer border p-3",
+                      effectiveAbilityMode === "selected"
+                        ? "border-red-800 bg-red-50"
+                        : "border-stone-300 bg-white",
+                      roomHasPlayers ? "cursor-not-allowed opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    <input
+                      checked={effectiveAbilityMode === "selected"}
+                      className="sr-only"
+                      disabled={roomHasPlayers}
+                      name="abilityMode"
+                      onChange={() => setSelectedAbilityMode("selected")}
+                      type="radio"
+                      value="selected"
+                    />
+                    <span className="font-semibold">選択固定</span>
+                  </label>
+                </div>
+              </fieldset>
               {effectiveAbilityMode === "selected" ? (
                 <AbilitySelector value={abilityId} onChange={setAbilityId} />
               ) : (
@@ -190,8 +236,4 @@ async function copyText(text: string) {
   } finally {
     document.body.removeChild(textarea);
   }
-}
-
-function parseAbilityMode(value: string | null): AbilityMode {
-  return value === "random_turn" ? "random_turn" : "selected";
 }
