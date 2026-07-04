@@ -15,8 +15,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 役割 | 技術 |
 |---|---|
 | フロントエンド | Next.js 16 App Router + TypeScript + Tailwind CSS |
-| リアルタイム同期 | PartyKit（WebSocket + サーバーサイドゲームロジック） |
-| デプロイ | Vercel（apps/web）+ PartyKit Cloud（party/） |
+| リアルタイム同期 | partyserver（Cloudflare Durable Objects + WebSocket）+ クライアントは partysocket |
+| デプロイ | Vercel（apps/web）+ Cloudflare Workers（party/、wrangler使用） |
 
 ## Monorepo Structure
 
@@ -36,15 +36,17 @@ npm run dev            # concurrently で apps/web + party を起動
 
 # 個別起動
 npm run dev -w apps/web   # Next.js のみ
-npm run dev -w party      # PartyKit のみ (localhost:1999)
+npm run dev -w party      # wrangler dev (localhost:1999)
 
 # ビルド
 npm run build          # Next.js ビルド
 
 # デプロイ
-npx partykit deploy    # party/ を PartyKit Cloud へ
-# vercel deploy は Vercel CLI または GitHub連携で行う
+npm run deploy -w party   # party/ を Cloudflare Workers へ（wrangler deploy）
+# apps/web は GitHub連携で Vercel に自動デプロイ
 ```
+
+**注意**: 旧 `partykit` CLI は使わない（PartyKit Cloud はデプロイ不可、無料プランのDurable Objects要件にも未対応）。サーバーは `partyserver` パッケージ + `wrangler` で運用する。設定は `party/wrangler.jsonc`（`new_sqlite_classes` マイグレーション指定が無料プランで必須）。
 
 ## Environment Variables
 

@@ -1,4 +1,9 @@
-import type * as Party from "partykit/server";
+import {
+  Server,
+  routePartykitRequest,
+  type Connection,
+  type WSMessage,
+} from "partyserver";
 import {
   applyMessage,
   createInitialState,
@@ -6,18 +11,27 @@ import {
 } from "./gameLogic/stateMachine";
 import type { ClientMessage, GameState, RollResult, ServerMessage } from "./types/game";
 
-export default class ChinchiroServer implements Party.Server {
-  private state: GameState;
+type Env = {
+  ChinchiroServer: DurableObjectNamespace;
+};
 
-  constructor(readonly room: Party.Room) {
-    this.state = createInitialState(room.id);
+export class ChinchiroServer extends Server<Env> {
+  private state: GameState = createInitialState("");
+
+  onStart() {
+    this.state = createInitialState(this.name);
   }
 
-  onConnect(conn: Party.Connection) {
+  onConnect(conn: Connection) {
     this.send(conn, { type: "state_update", state: this.state });
   }
 
-  onMessage(message: string, sender: Party.Connection) {
+  onMessage(sender: Connection, message: WSMessage) {
+    if (typeof message !== "string") {
+      this.send(sender, { type: "error", message: "不正なメッセージです" });
+      return;
+    }
+
     const parsed = this.parseClientMessage(message);
     if (!parsed) {
       this.send(sender, { type: "error", message: "不正なメッセージです" });
@@ -29,15 +43,15 @@ export default class ChinchiroServer implements Party.Server {
     const nextRoll = this.getLatestRoll(sender.id);
 
     if (nextRoll && nextRoll !== previousRoll) {
-      this.broadcast({ type: "roll_result", playerId: sender.id, result: nextRoll });
+      this.broadcastMessage({ type: "roll_result", playerId: sender.id, result: nextRoll });
     }
 
-    this.broadcast({ type: "state_update", state: this.state });
+    this.broadcastMessage({ type: "state_update", state: this.state });
   }
 
-  onClose(conn: Party.Connection) {
+  onClose(conn: Connection) {
     this.state = removePlayer(this.state, conn.id);
-    this.broadcast({ type: "state_update", state: this.state });
+    this.broadcastMessage({ type: "state_update", state: this.state });
   }
 
   private parseClientMessage(message: string): ClientMessage | null {
@@ -62,15 +76,20 @@ export default class ChinchiroServer implements Party.Server {
     return this.state.playerRolls[playerId] ?? null;
   }
 
-  private send(conn: Party.Connection, message: ServerMessage) {
+  private send(conn: Connection, message: ServerMessage) {
     conn.send(JSON.stringify(message));
   }
 
-  private broadcast(message: ServerMessage) {
-    this.room.broadcast(JSON.stringify(message));
+  private broadcastMessage(message: ServerMessage) {
+    this.broadcast(JSON.stringify(message));
   }
 }
 
-export const onFetch = async (_req: Request) => {
-  return new Response("hyper-chinchiro party server", { status: 200 });
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return (
+      (await routePartykitRequest(request, env)) ??
+      new Response("hyper-chinchiro party server", { status: 200 })
+    );
+  },
 };

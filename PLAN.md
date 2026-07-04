@@ -241,19 +241,23 @@ function rollWithWeights(weights: DiceWeights): number {
 ```bash
 # apps/web/.env.local
 NEXT_PUBLIC_PARTYKIT_HOST=localhost:1999   # ローカル開発時
-# 本番は npx partykit deploy 後に表示されるホスト名を設定
+# 本番は wrangler deploy 後に表示される workers.dev のホスト名を設定
 ```
 
 ---
 
 ## デプロイ
 
+> 旧 `partykit` CLI はデプロイ不可（PartyKit Cloud のドメイン上限＋無料プランの
+> `new_sqlite_classes` 要件に未対応）。サーバーは `partyserver` + `wrangler` で運用する。
+
 ```bash
-# PartyKit（Cloudflare Workers）
-npx partykit deploy   # Cloudflareアカウントへのログインが必要
+# ゲームサーバー（Cloudflare Workers、party/ から実行）
+npx wrangler deploy   # Cloudflareアカウントへのログインが必要（npx wrangler login）
 
 # Next.js（Vercel）
 # GitHub（raiki-yamane29/hyper_chinchiro）連携で自動デプロイ
+# Vercel の環境変数 NEXT_PUBLIC_PARTYKIT_HOST に workers.dev ホストを設定すること
 ```
 
 ---

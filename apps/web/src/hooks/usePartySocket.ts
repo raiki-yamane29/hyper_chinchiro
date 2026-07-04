@@ -22,6 +22,8 @@ export function usePartySocket({ roomId }: UsePartySocketOptions) {
 
     const nextSocket = new PartySocket({
       host,
+      // partyserver 側の Durable Object バインディング名（ChinchiroServer）の kebab-case
+      party: "chinchiro-server",
       room: roomId,
     });
 

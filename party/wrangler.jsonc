@@ -1,0 +1,26 @@
+{
+  "name": "hyper-chinchiro",
+  "main": "src/server.ts",
+  "compatibility_date": "2024-12-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ChinchiroServer",
+        "class_name": "ChinchiroServer"
+      }
+    ]
+  },
+  // 無料プランでは Durable Objects に SQLite バックエンドの指定が必須
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ChinchiroServer"]
+    }
+  ],
+  "dev": {
+    "port": 1999
+  },
+  "observability": {
+    "enabled": true
+  }
+}
