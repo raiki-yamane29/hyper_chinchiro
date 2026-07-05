@@ -527,51 +527,32 @@ function getSettlementPoints(
   winnerRoll: RollResult | undefined,
   loserRoll: RollResult | undefined,
 ): { points: number; reason: string } {
-  const multiplier = Math.max(
-    getWinnerMultiplier(winnerRoll),
-    loserRoll?.hand === "123" ? 2 : 1,
-  );
-
-  if (
-    winnerRoll?.hand === "trips" &&
-    winnerRoll.dice.every((value) => value === 1)
-  ) {
-    return { points: 5, reason: "ピンゾロ 5倍" };
-  }
+  // 勝者の役倍率と敗者ヒフミの2倍は乗算する（ゾロ目勝ち×ヒフミ負け = 3×2 = 6倍）
+  const parts: string[] = [];
+  let points = 1;
 
   if (winnerRoll?.hand === "trips") {
-    return { points: multiplier, reason: "ゾロ目 3倍" };
-  }
-
-  if (winnerRoll?.hand === "456") {
-    return { points: multiplier, reason: "あらし 2倍" };
+    if (winnerRoll.dice.every((value) => value === 1)) {
+      points *= 5;
+      parts.push("ピンゾロ 5倍");
+    } else {
+      points *= 3;
+      parts.push("ゾロ目 3倍");
+    }
+  } else if (winnerRoll?.hand === "456") {
+    points *= 2;
+    parts.push("あらし 2倍");
   }
 
   if (loserRoll?.hand === "123") {
-    return { points: multiplier, reason: "ヒフミ -2倍" };
+    points *= 2;
+    parts.push("ヒフミ 2倍");
   }
 
-  return { points: 1, reason: "通常 1pt" };
-}
-
-function getWinnerMultiplier(roll: RollResult | undefined): number {
-  if (!roll) {
-    return 1;
-  }
-
-  if (roll.hand === "trips" && roll.dice.every((value) => value === 1)) {
-    return 5;
-  }
-
-  if (roll.hand === "trips") {
-    return 3;
-  }
-
-  if (roll.hand === "456") {
-    return 2;
-  }
-
-  return 1;
+  return {
+    points,
+    reason: parts.length > 0 ? parts.join(" × ") : "通常 1pt",
+  };
 }
 
 function nextPlayerIndex(state: GameState, fromIndex: number): number {

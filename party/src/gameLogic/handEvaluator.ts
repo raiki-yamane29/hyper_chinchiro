@@ -9,11 +9,13 @@ export function evaluateHand(dice: [number, number, number]): RollResult {
     hand = "123";
     handValue = -1;
   } else if (sorted[0] === 4 && sorted[1] === 5 && sorted[2] === 6) {
+    // 456はゾロ目より弱い
     hand = "456";
-    handValue = 1000;
+    handValue = 500;
   } else if (sorted[0] === sorted[1] && sorted[1] === sorted[2]) {
+    // ゾロ目は456より強く、ピンゾロ(111)が全役中最強
     hand = "trips";
-    handValue = 100 + sorted[0];
+    handValue = sorted[0] === 1 ? 2000 : 1000 + sorted[0];
   } else {
     const counts = new Map<number, number>();
     for (const value of sorted) {

@@ -33,6 +33,9 @@ export function HandResult({ roll }: HandResultProps) {
 
 function formatHand(roll: RollResult): string {
   if (roll.hand === "trips") {
+    if (roll.dice[0] === 1) {
+      return "ピンゾロ";
+    }
     return `${handLabels[roll.hand]}${roll.dice[0]}`;
   }
 
