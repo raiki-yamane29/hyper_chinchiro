@@ -204,6 +204,10 @@ function DebugConsole({ roomId }: { roomId: string }) {
         {error && <p className="mt-2 text-red-800">{error}</p>}
       </section>
 
+      {Object.keys(state.roundSettlements).length > 0 && (
+        <SettlementSummary state={state} />
+      )}
+
       <section className="grid gap-3 border border-stone-300 bg-white p-4">
         <h2 className="text-sm font-bold">ダミープレイヤーを追加</h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -264,6 +268,64 @@ function DebugConsole({ roomId }: { roomId: string }) {
         />
       ))}
     </div>
+  );
+}
+
+function SettlementSummary({ state }: { state: GameState }) {
+  const nameOf = (id: string) =>
+    state.players.find((player) => player.id === id)?.nickname ?? id;
+  const settlements = Object.values(state.roundSettlements);
+  const bankerTotal = settlements.reduce(
+    (total, settlement) => total + settlement.bankerDelta,
+    0,
+  );
+  const bankerName = settlements[0] ? nameOf(settlements[0].bankerId) : "-";
+
+  return (
+    <section className="border-2 border-emerald-600 bg-white p-4 text-sm">
+      <h2 className="mb-3 font-bold">このラウンドのポイント移動</h2>
+      <div className="grid gap-2">
+        {settlements.map((settlement) => (
+          <div
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-stone-200 pb-2"
+            key={settlement.playerId}
+          >
+            <span className="font-semibold">
+              {nameOf(settlement.playerId)}
+            </span>
+            <DeltaBadge value={settlement.playerDelta} />
+            <span className="text-stone-400">⇔</span>
+            <span className="font-semibold">
+              {nameOf(settlement.bankerId)}（親）
+            </span>
+            <DeltaBadge value={settlement.bankerDelta} />
+            <span className="text-xs text-stone-500">
+              勝者: {nameOf(settlement.winnerId)} / {settlement.reason}
+            </span>
+          </div>
+        ))}
+        <div className="flex items-center gap-3 pt-1">
+          <span className="font-semibold">{bankerName}（親）の合計</span>
+          <DeltaBadge value={bankerTotal} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DeltaBadge({ value }: { value: number }) {
+  const color =
+    value > 0
+      ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+      : value < 0
+        ? "bg-red-50 text-red-800 border-red-300"
+        : "bg-stone-50 text-stone-600 border-stone-300";
+
+  return (
+    <span className={`border px-2 py-0.5 font-mono font-bold ${color}`}>
+      {value > 0 ? "+" : ""}
+      {value}pt
+    </span>
   );
 }
 
