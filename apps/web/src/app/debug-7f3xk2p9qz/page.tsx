@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { nanoid } from "nanoid";
 import { abilities } from "@/components/lobby/AbilitySelector";
 import { useGameState } from "@/hooks/useGameState";
 import { usePartySocket } from "@/hooks/usePartySocket";
@@ -11,6 +12,25 @@ const abilityNames = new Map(abilities.map((a) => [a.id as string, a.name]));
 export default function DebugPage() {
   const [roomIdInput, setRoomIdInput] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+
+  // ページを開いた時点で検証用ルームを自動生成する
+  useEffect(() => {
+    setRoomId(nanoid(8));
+  }, []);
+
+  useEffect(() => {
+    if (copyState === "idle") {
+      return;
+    }
+    const timeout = window.setTimeout(() => setCopyState("idle"), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [copyState]);
+
+  const roomUrl =
+    roomId && typeof window !== "undefined"
+      ? `${window.location.origin}/room/${roomId}`
+      : "";
 
   return (
     <main className="min-h-screen bg-[#f7f2e8] p-6 text-stone-950">
@@ -22,21 +42,64 @@ export default function DebugPage() {
           </p>
         </header>
 
+        <section className="grid gap-3 border-2 border-red-800 bg-white p-4">
+          <span className="text-xs font-bold uppercase text-red-800">
+            検証ルーム
+          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <code className="select-all font-mono text-xl font-bold">
+              {roomId || "生成中…"}
+            </code>
+            <button
+              className="h-10 bg-red-800 px-4 text-sm font-semibold text-white"
+              disabled={!roomUrl}
+              onClick={async () => {
+                await navigator.clipboard.writeText(roomUrl);
+                setCopyState("copied");
+              }}
+              type="button"
+            >
+              {copyState === "copied" ? "コピー済み" : "ルームURLをコピー"}
+            </button>
+            {roomUrl && (
+              <a
+                className="flex h-10 items-center border border-stone-400 px-4 text-sm font-semibold"
+                href={roomUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                ルームを開く
+              </a>
+            )}
+            <button
+              className="h-10 border border-stone-400 px-4 text-sm font-semibold"
+              onClick={() => setRoomId(nanoid(8))}
+              type="button"
+            >
+              作り直す
+            </button>
+          </div>
+          <p className="text-xs text-stone-600">
+            このURLを別タブ/別端末で開いてプレイヤーとして参加し、下の操作パネルで検証できます。
+          </p>
+        </section>
+
         <form
           className="flex gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             setRoomId(roomIdInput.trim());
+            setRoomIdInput("");
           }}
         >
           <input
             className="h-11 flex-1 border border-stone-300 bg-white px-3 outline-none focus:border-red-700"
-            placeholder="ルームID（例: Ab3xK9pQ）"
+            placeholder="既存のルームIDに接続する場合はここに入力"
             value={roomIdInput}
             onChange={(event) => setRoomIdInput(event.target.value)}
           />
           <button
-            className="h-11 bg-red-800 px-5 font-semibold text-white disabled:bg-stone-400"
+            className="h-11 border border-stone-400 px-5 font-semibold disabled:text-stone-400"
             disabled={!roomIdInput.trim()}
             type="submit"
           >
