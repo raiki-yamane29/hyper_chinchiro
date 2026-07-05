@@ -5,11 +5,12 @@ export interface Ability {
   name: string;
   description: string;
   isActive: boolean;
+  /** ランダム能力モードでの抽選重み。大きいほど出やすい（強力な能力ほど小さくする） */
+  rarityWeight: number;
   applyWeights: (base: DiceWeights, ctx: AbilityContext) => DiceWeights;
 }
 
 export interface AbilityContext {
-  previousDice?: [number, number, number];
   rollCount: number;
   abilityUsedThisRound: boolean;
   pinnedDiceValue?: number;
@@ -21,47 +22,69 @@ function cloneWeights(weights: DiceWeights): DiceWeights {
   return [...weights] as DiceWeights;
 }
 
+function favorSingle(index: number, multiplier: number) {
+  return (base: DiceWeights): DiceWeights => {
+    const weights = cloneWeights(base);
+    weights[index] *= multiplier;
+    return weights;
+  };
+}
+
 export const ABILITIES: Ability[] = [
+  {
+    id: "lucky_one",
+    name: "ラッキーワン",
+    description: "1のウェイトを3倍にする",
+    isActive: false,
+    rarityWeight: 10,
+    applyWeights: favorSingle(0, 3),
+  },
   {
     id: "trickster",
     name: "イカサマ師",
     description: "2のウェイトを3倍にする",
     isActive: false,
-    applyWeights: (base) => {
-      const weights = cloneWeights(base);
-      weights[1] *= 3;
-      return weights;
-    },
+    rarityWeight: 10,
+    applyWeights: favorSingle(1, 3),
+  },
+  {
+    id: "lucky_three",
+    name: "ラッキースリー",
+    description: "3のウェイトを3倍にする",
+    isActive: false,
+    rarityWeight: 10,
+    applyWeights: favorSingle(2, 3),
+  },
+  {
+    id: "lucky_four",
+    name: "ラッキーフォー",
+    description: "4のウェイトを3倍にする",
+    isActive: false,
+    rarityWeight: 10,
+    applyWeights: favorSingle(3, 3),
+  },
+  {
+    id: "lucky_five",
+    name: "ラッキーファイブ",
+    description: "5のウェイトを3倍にする",
+    isActive: false,
+    rarityWeight: 10,
+    applyWeights: favorSingle(4, 3),
   },
   {
     id: "lucky_six",
     name: "ラッキーシックス",
     description: "6のウェイトを3倍にする",
     isActive: false,
-    applyWeights: (base) => {
-      const weights = cloneWeights(base);
-      weights[5] *= 3;
-      return weights;
-    },
-  },
-  {
-    id: "all_high",
-    name: "オールフォア",
-    description: "4・5・6のウェイトを各2倍にする",
-    isActive: false,
-    applyWeights: (base) => {
-      const weights = cloneWeights(base);
-      weights[3] *= 2;
-      weights[4] *= 2;
-      weights[5] *= 2;
-      return weights;
-    },
+    rarityWeight: 6,
+    applyWeights: favorSingle(5, 3),
   },
   {
     id: "no_one",
     name: "ピンゾロ封じ",
     description: "1のウェイトを0.2倍にする",
     isActive: false,
+    rarityWeight: 10,
     applyWeights: (base) => {
       const weights = cloneWeights(base);
       weights[0] *= 0.2;
@@ -73,27 +96,40 @@ export const ABILITIES: Ability[] = [
     name: "カオスダイス",
     description: "毎回ランダムなウェイトを生成する",
     isActive: false,
+    rarityWeight: 10,
     applyWeights: () =>
       Array.from({ length: 6 }, () => 0.5 + Math.random() * 3) as DiceWeights,
   },
   {
-    id: "mirror",
-    name: "ミラーロール",
-    description: "直前の相手の出目のウェイトを上げる",
+    id: "shigoro",
+    name: "シゴロ賽",
+    description: "4・5・6の目しか出なくする",
     isActive: false,
-    applyWeights: (base, ctx) => {
-      const weights = cloneWeights(base);
-      for (const value of ctx.previousDice ?? []) {
-        weights[value - 1] += 2;
-      }
-      return weights;
-    },
+    rarityWeight: 1,
+    applyWeights: () => [0, 0, 0, 1, 1, 1],
+  },
+  {
+    id: "hifumi123",
+    name: "123賽",
+    description: "1・2・3の目しか出なくする",
+    isActive: false,
+    rarityWeight: 10,
+    applyWeights: () => [1, 1, 1, 0, 0, 0],
+  },
+  {
+    id: "gambler",
+    name: "ギャンブラー",
+    description: "勝った時と負けた時の獲得ポイントが倍になる",
+    isActive: false,
+    rarityWeight: 3,
+    applyWeights: (base) => cloneWeights(base),
   },
   {
     id: "godhand",
     name: "神の一手",
     description: "1ラウンド1回、サイコロ1個を任意の目に固定する",
     isActive: true,
+    rarityWeight: 1,
     applyWeights: (base, ctx) => {
       if (!ctx.pinnedDiceValue || ctx.abilityUsedThisRound) {
         return cloneWeights(base);
@@ -109,6 +145,7 @@ export const ABILITIES: Ability[] = [
     name: "ダブルチャンス",
     description: "役なし時の振り直し上限を1回増やす",
     isActive: false,
+    rarityWeight: 3,
     applyWeights: (base) => cloneWeights(base),
   },
 ];

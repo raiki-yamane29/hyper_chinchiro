@@ -250,14 +250,7 @@ function rollForCurrentTurn(
     return nextState;
   }
 
-  const previousDice = getPreviousDice(nextState, activePlayer.id);
-  const roll = rollDiceForPlayer(
-    activePlayer,
-    abilityId,
-    rollCount,
-    previousDice,
-    pinnedValue,
-  );
+  const roll = rollDiceForPlayer(activePlayer, abilityId, rollCount, pinnedValue);
   const rollCountMap = { ...nextState.rollCountMap, [senderId]: rollCount };
   const players = nextState.players.map((player) =>
     player.id === senderId && isGodhandRoll
@@ -338,42 +331,23 @@ function rollDiceForPlayer(
   player: Player,
   abilityId: string,
   rollCount: number,
-  previousDice?: [number, number, number],
   pinnedValue?: number,
 ): RollResult {
   if (abilityId === "godhand" && pinnedValue !== undefined) {
-    const remainingWeights = applyAbilityWeights(
-      abilityId,
-      BASE_WEIGHTS,
-      {
-        previousDice,
-        rollCount,
-        abilityUsedThisRound: player.abilityUsedThisRound,
-        pinnedDiceValue: pinnedValue,
-      },
-    );
+    const remainingWeights = applyAbilityWeights(abilityId, BASE_WEIGHTS, {
+      rollCount,
+      abilityUsedThisRound: player.abilityUsedThisRound,
+      pinnedDiceValue: pinnedValue,
+    });
     const dice: [number, number, number] = [
       pinnedValue,
-      rollWithPlayerWeights(
-        player,
-        abilityId,
-        rollCount,
-        previousDice,
-        remainingWeights,
-      ),
-      rollWithPlayerWeights(
-        player,
-        abilityId,
-        rollCount,
-        previousDice,
-        remainingWeights,
-      ),
+      rollWithPlayerWeights(player, abilityId, rollCount, remainingWeights),
+      rollWithPlayerWeights(player, abilityId, rollCount, remainingWeights),
     ];
     return evaluateHand(shuffleDice(dice));
   }
 
   const weights = applyAbilityWeights(abilityId, BASE_WEIGHTS, {
-    previousDice,
     rollCount,
     abilityUsedThisRound: player.abilityUsedThisRound,
   });
@@ -389,14 +363,12 @@ function rollWithPlayerWeights(
   player: Player,
   abilityId: string,
   rollCount: number,
-  previousDice: [number, number, number] | undefined,
   base: DiceWeights,
 ): number {
   const weights =
     abilityId === "godhand"
       ? BASE_WEIGHTS
       : applyAbilityWeights(abilityId, base, {
-          previousDice,
           rollCount,
           abilityUsedThisRound: player.abilityUsedThisRound,
         });
@@ -464,12 +436,21 @@ function finishRound(state: GameState): GameState {
     }
 
     const playerRoll = state.playerRolls[player.id];
-    const settlement = createSettlement(
+    const rawSettlement = createSettlement(
       banker,
       player,
       state.bankerRoll,
       playerRoll,
     );
+    const bankerMultiplier =
+      getEffectiveAbilityId(state, banker) === "gambler" ? 2 : 1;
+    const playerMultiplier =
+      getEffectiveAbilityId(state, player) === "gambler" ? 2 : 1;
+    const settlement: RoundSettlement = {
+      ...rawSettlement,
+      bankerDelta: rawSettlement.bankerDelta * bankerMultiplier,
+      playerDelta: rawSettlement.playerDelta * playerMultiplier,
+    };
     scores[banker.id] = (scores[banker.id] ?? 0) + settlement.bankerDelta;
     scores[player.id] = (scores[player.id] ?? 0) + settlement.playerDelta;
     roundSettlements[player.id] = settlement;
@@ -601,24 +582,6 @@ function nextPlayerIndex(state: GameState, fromIndex: number): number {
   return (fromIndex + 1) % state.players.length;
 }
 
-function getPreviousDice(
-  state: GameState,
-  currentPlayerId: string,
-): [number, number, number] | undefined {
-  const playerIds = state.players.map((player) => player.id);
-  const currentIndex = playerIds.indexOf(currentPlayerId);
-  const previousPlayerId =
-    currentIndex <= 0
-      ? playerIds[playerIds.length - 1]
-      : playerIds[currentIndex - 1];
-
-  if (previousPlayerId === state.players[state.bankerIndex]?.id) {
-    return state.bankerRoll?.dice;
-  }
-
-  return state.playerRolls[previousPlayerId]?.dice ?? state.bankerRoll?.dice;
-}
-
 function shuffleDice(dice: [number, number, number]): [number, number, number] {
   const copy = [...dice];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -688,8 +651,18 @@ function getEffectiveAbilityId(state: GameState, player: Player): string {
 }
 
 function randomAbilityId(): string {
-  const index = Math.floor(Math.random() * ABILITIES.length);
-  return ABILITIES[index]?.id ?? ABILITIES[0].id;
+  const totalWeight = ABILITIES.reduce(
+    (sum, ability) => sum + ability.rarityWeight,
+    0,
+  );
+  let rand = Math.random() * totalWeight;
+  for (const ability of ABILITIES) {
+    rand -= ability.rarityWeight;
+    if (rand <= 0) {
+      return ability.id;
+    }
+  }
+  return ABILITIES[0].id;
 }
 
 function isAbilityMode(value: unknown): value is AbilityMode {

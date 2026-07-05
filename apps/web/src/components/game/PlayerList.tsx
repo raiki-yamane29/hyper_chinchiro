@@ -3,12 +3,17 @@
 import type { GameState } from "@/types/game";
 
 const abilityNames: Record<string, string> = {
+  lucky_one: "ラッキーワン",
   trickster: "イカサマ師",
+  lucky_three: "ラッキースリー",
+  lucky_four: "ラッキーフォー",
+  lucky_five: "ラッキーファイブ",
   lucky_six: "ラッキーシックス",
-  all_high: "オールフォア",
   no_one: "ピンゾロ封じ",
   chaos: "カオスダイス",
-  mirror: "ミラーロール",
+  shigoro: "シゴロ賽",
+  hifumi123: "123賽",
+  gambler: "ギャンブラー",
   godhand: "神の一手",
   double_chance: "ダブルチャンス",
 };

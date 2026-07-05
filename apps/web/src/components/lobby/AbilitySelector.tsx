@@ -2,19 +2,34 @@
 
 export const abilities = [
   {
+    id: "lucky_one",
+    name: "ラッキーワン",
+    description: "1の出目が出やすい",
+  },
+  {
     id: "trickster",
     name: "イカサマ師",
     description: "2の出目が出やすい",
   },
   {
+    id: "lucky_three",
+    name: "ラッキースリー",
+    description: "3の出目が出やすい",
+  },
+  {
+    id: "lucky_four",
+    name: "ラッキーフォー",
+    description: "4の出目が出やすい",
+  },
+  {
+    id: "lucky_five",
+    name: "ラッキーファイブ",
+    description: "5の出目が出やすい",
+  },
+  {
     id: "lucky_six",
     name: "ラッキーシックス",
     description: "6の出目が出やすい",
-  },
-  {
-    id: "all_high",
-    name: "オールフォア",
-    description: "4・5・6が出やすい",
   },
   {
     id: "no_one",
@@ -27,9 +42,19 @@ export const abilities = [
     description: "毎回ウェイトが変わる",
   },
   {
-    id: "mirror",
-    name: "ミラーロール",
-    description: "直前の出目に寄せる",
+    id: "shigoro",
+    name: "シゴロ賽",
+    description: "4・5・6の目しか出ない",
+  },
+  {
+    id: "hifumi123",
+    name: "123賽",
+    description: "1・2・3の目しか出ない",
+  },
+  {
+    id: "gambler",
+    name: "ギャンブラー",
+    description: "勝敗時の獲得ポイントが倍になる",
   },
   {
     id: "godhand",

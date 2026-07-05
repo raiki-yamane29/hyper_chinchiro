@@ -11,23 +11,33 @@ import type {
 } from "@/types/game";
 
 const abilityNames: Record<string, string> = {
+  lucky_one: "ラッキーワン",
   trickster: "イカサマ師",
+  lucky_three: "ラッキースリー",
+  lucky_four: "ラッキーフォー",
+  lucky_five: "ラッキーファイブ",
   lucky_six: "ラッキーシックス",
-  all_high: "オールフォア",
   no_one: "ピンゾロ封じ",
   chaos: "カオスダイス",
-  mirror: "ミラーロール",
+  shigoro: "シゴロ賽",
+  hifumi123: "123賽",
+  gambler: "ギャンブラー",
   godhand: "神の一手",
   double_chance: "ダブルチャンス",
 };
 
 const abilityDescriptions: Record<string, string> = {
+  lucky_one: "1の出目が出やすくなります。",
   trickster: "2の出目が出やすくなります。",
+  lucky_three: "3の出目が出やすくなります。",
+  lucky_four: "4の出目が出やすくなります。",
+  lucky_five: "5の出目が出やすくなります。",
   lucky_six: "6の出目が出やすくなります。",
-  all_high: "4・5・6の出目が出やすくなります。",
   no_one: "1の出目を抑えて、ピンゾロやヒフミに寄りにくくします。",
   chaos: "手番ごとにサイコロの重みがランダムに変わります。",
-  mirror: "直前の相手の出目に寄りやすくなります。",
+  shigoro: "4・5・6の目しか出なくなります。",
+  hifumi123: "1・2・3の目しか出なくなります。",
+  gambler: "勝った時と負けた時の獲得ポイントが倍になります。",
   godhand: "1ラウンド1回だけ、サイコロ1個を任意の目に固定できます。",
   double_chance: "役なし時の振り直し上限が1回増えます。",
 };
