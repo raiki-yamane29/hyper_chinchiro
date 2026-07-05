@@ -40,6 +40,7 @@ interface GameBoardProps {
   onRoll: () => void;
   onUseGodhand: (pinnedValue: number) => void;
   onNextRound: () => void;
+  onReturnToLobby: () => void;
 }
 
 export function GameBoard({
@@ -50,6 +51,7 @@ export function GameBoard({
   onRoll,
   onUseGodhand,
   onNextRound,
+  onReturnToLobby,
 }: GameBoardProps) {
   const [pinnedValue, setPinnedValue] = useState(6);
   const banker = state?.players[state.bankerIndex] ?? null;
@@ -170,6 +172,7 @@ export function GameBoard({
           isMyTurn={isMyTurn}
           onNextRound={onNextRound}
           onReady={onReady}
+          onReturnToLobby={onReturnToLobby}
           onRoll={onRoll}
           phase={state?.phase ?? null}
           self={self}
@@ -186,6 +189,7 @@ function ActionBar({
   isMyTurn,
   onNextRound,
   onReady,
+  onReturnToLobby,
   onRoll,
   phase,
   self,
@@ -196,6 +200,7 @@ function ActionBar({
   isMyTurn: boolean;
   onNextRound: () => void;
   onReady: () => void;
+  onReturnToLobby: () => void;
   onRoll: () => void;
   phase: GameState["phase"] | null;
   self: Player;
@@ -241,16 +246,27 @@ function ActionBar({
         >
           {statusText}
         </span>
-        {action && (
-          <button
-            className="h-14 min-w-40 shrink-0 bg-red-800 px-8 text-lg font-bold text-white transition-transform active:scale-95 disabled:bg-stone-400 sm:min-w-56"
-            disabled={action.disabled}
-            onClick={action.onClick}
-            type="button"
-          >
-            {action.label}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {isGameOver && (
+            <button
+              className="h-14 border border-stone-400 px-4 text-sm font-semibold text-stone-700 transition-transform active:scale-95"
+              onClick={onReturnToLobby}
+              type="button"
+            >
+              能力モードに戻る
+            </button>
+          )}
+          {action && (
+            <button
+              className="h-14 min-w-40 bg-red-800 px-8 text-lg font-bold text-white transition-transform active:scale-95 disabled:bg-stone-400 sm:min-w-56"
+              disabled={action.disabled}
+              onClick={action.onClick}
+              type="button"
+            >
+              {action.label}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

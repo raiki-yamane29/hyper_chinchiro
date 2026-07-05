@@ -61,7 +61,8 @@ export type ClientMessage =
   | { type: "ready" }
   | { type: "roll" }
   | { type: "use_active_ability"; payload: { pinnedValue: number } }
-  | { type: "next_round" };
+  | { type: "next_round" }
+  | { type: "return_to_lobby" };
 
 export type ServerMessage =
   | { type: "state_update"; state: GameState }

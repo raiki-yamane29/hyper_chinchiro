@@ -60,6 +60,8 @@ export function applyMessage(
       return rollForCurrentTurn(state, senderId, msg.payload.pinnedValue);
     case "next_round":
       return startNextRound(state);
+    case "return_to_lobby":
+      return returnToLobby(state);
     default:
       return state;
   }
@@ -119,13 +121,15 @@ function joinGame(
   const ability = getAbility(abilityId);
   const existing = state.players.find((player) => player.id === senderId);
   const nextAbilityMode =
-    state.players.length === 0 && isAbilityMode(abilityMode)
+    state.phase === "lobby" && isAbilityMode(abilityMode)
       ? abilityMode
       : state.abilityMode;
 
   if (existing) {
     return {
       ...state,
+      abilityMode: nextAbilityMode,
+      phase: state.phase === "lobby" ? "ability_select" : state.phase,
       players: state.players.map((player) =>
         player.id === senderId
           ? {
@@ -164,6 +168,33 @@ function joinGame(
       ...state.rollCountMap,
       [senderId]: 0,
     },
+  };
+}
+
+function returnToLobby(state: GameState): GameState {
+  if (state.phase !== "game_over") {
+    return state;
+  }
+
+  return {
+    ...state,
+    phase: "lobby",
+    bankerIndex: 0,
+    currentPlayerIndex: 0,
+    bankerRoll: null,
+    playerRolls: {},
+    roundSettlements: {},
+    scores: Object.fromEntries(state.players.map((player) => [player.id, 0])),
+    round: 1,
+    rollCountMap: Object.fromEntries(
+      state.players.map((player) => [player.id, 0]),
+    ),
+    currentTurnAbilityMap: {},
+    players: state.players.map((player) => ({
+      ...player,
+      abilityUsedThisRound: false,
+      isReady: false,
+    })),
   };
 }
 

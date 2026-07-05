@@ -26,6 +26,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
   );
   const { socket, status } = usePartySocket({ roomId });
   const { state, lastRoll, error, send } = useGameState(socket);
+  const isLobbyPhase = !state || state.phase === "lobby";
   const roomHasPlayers = Boolean(state?.players.length);
   const effectiveAbilityMode = roomHasPlayers
     ? (state?.abilityMode ?? "random_turn")
@@ -89,7 +90,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
           </div>
         </header>
 
-        {!me && (
+        {(!me || isLobbyPhase) && (
           <form
             className="grid gap-4 border border-stone-300 bg-white p-4 shadow-sm"
             onSubmit={(event) => {
@@ -129,13 +130,13 @@ export function RoomClient({ roomId }: RoomClientProps) {
                       effectiveAbilityMode === "random_turn"
                         ? "border-red-800 bg-red-50"
                         : "border-stone-300 bg-white",
-                      roomHasPlayers ? "cursor-not-allowed opacity-70" : "",
+                      isLobbyPhase ? "" : "cursor-not-allowed opacity-70",
                     ].join(" ")}
                   >
                     <input
                       checked={effectiveAbilityMode === "random_turn"}
                       className="sr-only"
-                      disabled={roomHasPlayers}
+                      disabled={!isLobbyPhase}
                       name="abilityMode"
                       onChange={() => setSelectedAbilityMode("random_turn")}
                       type="radio"
@@ -149,13 +150,13 @@ export function RoomClient({ roomId }: RoomClientProps) {
                       effectiveAbilityMode === "selected"
                         ? "border-red-800 bg-red-50"
                         : "border-stone-300 bg-white",
-                      roomHasPlayers ? "cursor-not-allowed opacity-70" : "",
+                      isLobbyPhase ? "" : "cursor-not-allowed opacity-70",
                     ].join(" ")}
                   >
                     <input
                       checked={effectiveAbilityMode === "selected"}
                       className="sr-only"
-                      disabled={roomHasPlayers}
+                      disabled={!isLobbyPhase}
                       name="abilityMode"
                       onChange={() => setSelectedAbilityMode("selected")}
                       type="radio"
@@ -201,6 +202,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
             lastRollPlayerId={lastRoll?.playerId}
             onNextRound={() => send({ type: "next_round" })}
             onReady={() => send({ type: "ready" })}
+            onReturnToLobby={() => send({ type: "return_to_lobby" })}
             onRoll={() => send({ type: "roll" })}
             onUseGodhand={(pinnedValue) =>
               send({ type: "use_active_ability", payload: { pinnedValue } })
