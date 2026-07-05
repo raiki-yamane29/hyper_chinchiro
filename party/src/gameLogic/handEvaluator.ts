@@ -25,7 +25,8 @@ export function evaluateHand(dice: [number, number, number]): RollResult {
 
     if (pair && single) {
       hand = "pair";
-      handValue = pair[0] * 10 + single[0];
+      // 目アリの強さは「目」（ペアでない余りの1個）で決まる。ペアの数字は無関係
+      handValue = single[0];
     }
   }
 

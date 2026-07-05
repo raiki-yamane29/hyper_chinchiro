@@ -43,7 +43,7 @@ function formatHand(roll: RollResult): string {
     }
 
     const single = [...counts.entries()].find(([, count]) => count === 1);
-    return `${handLabels[roll.hand]} ${single?.[0] ?? roll.handValue % 10}`;
+    return `${handLabels[roll.hand]} ${single?.[0] ?? roll.handValue}`;
   }
 
   return handLabels[roll.hand];
