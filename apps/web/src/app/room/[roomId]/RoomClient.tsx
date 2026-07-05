@@ -59,7 +59,8 @@ export function RoomClient({ roomId }: RoomClientProps) {
 
   return (
     <main className="min-h-screen bg-[#f7f2e8] text-stone-950">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
+      {/* pb-32: 画面下部固定のアクションバーと重ならないための余白 */}
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pt-8 pb-32 sm:px-6">
         <header className="flex flex-col gap-4 border-b border-stone-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-normal">Hyper Chinchiro</h1>

@@ -95,37 +95,11 @@ export function GameBoard({
       </div>
 
       {self && (
-        <div className="mb-5 grid gap-4 border-b border-stone-200 pb-5 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="mb-5 border-b border-stone-200 pb-5">
           <AbilityCard
             abilityId={activeAbilityId}
             randomMode={state?.abilityMode === "random_turn"}
           />
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="h-10 bg-stone-900 px-4 text-sm font-semibold text-white disabled:bg-stone-400"
-              disabled={self.isReady}
-              onClick={onReady}
-              type="button"
-            >
-              {isGameOver ? "再戦 Ready" : "Ready"}
-            </button>
-            <button
-              className="h-10 bg-red-800 px-4 text-sm font-semibold text-white disabled:bg-stone-400"
-              disabled={!canRoll}
-              onClick={onRoll}
-              type="button"
-            >
-              振る
-            </button>
-            <button
-              className="h-10 border border-stone-400 px-4 text-sm font-semibold disabled:text-stone-400"
-              disabled={state?.phase !== "round_result"}
-              onClick={onNextRound}
-              type="button"
-            >
-              次ラウンド
-            </button>
-          </div>
         </div>
       )}
 
@@ -186,6 +160,97 @@ export function GameBoard({
               state={state}
             />
           ))}
+      </div>
+
+      {self && (
+        <ActionBar
+          activePlayer={activePlayer}
+          canRoll={canRoll}
+          isGameOver={isGameOver}
+          isMyTurn={isMyTurn}
+          onNextRound={onNextRound}
+          onReady={onReady}
+          onRoll={onRoll}
+          phase={state?.phase ?? null}
+          self={self}
+        />
+      )}
+    </div>
+  );
+}
+
+function ActionBar({
+  activePlayer,
+  canRoll,
+  isGameOver,
+  isMyTurn,
+  onNextRound,
+  onReady,
+  onRoll,
+  phase,
+  self,
+}: {
+  activePlayer: Player | null;
+  canRoll: boolean;
+  isGameOver: boolean;
+  isMyTurn: boolean;
+  onNextRound: () => void;
+  onReady: () => void;
+  onRoll: () => void;
+  phase: GameState["phase"] | null;
+  self: Player;
+}) {
+  let statusText = "";
+  let action: { label: string; onClick: () => void; disabled: boolean } | null =
+    null;
+
+  if (phase === "lobby" || phase === "ability_select") {
+    statusText = "全員がReadyになると開始します";
+    action = {
+      label: self.isReady ? "Ready済み" : "Ready",
+      onClick: onReady,
+      disabled: self.isReady,
+    };
+  } else if (phase === "banker_turn" || phase === "player_turn") {
+    if (isMyTurn) {
+      statusText = "あなたの番です！";
+      action = { label: "振る", onClick: onRoll, disabled: !canRoll };
+    } else {
+      statusText = `${activePlayer?.nickname ?? "-"} の番です`;
+    }
+  } else if (phase === "round_result") {
+    statusText = "結果を確認したら次へ";
+    action = { label: "次ラウンド", onClick: onNextRound, disabled: false };
+  } else if (isGameOver) {
+    statusText = "ゲーム終了！全員Readyで再戦";
+    action = {
+      label: self.isReady ? "Ready済み" : "再戦 Ready",
+      onClick: onReady,
+      disabled: self.isReady,
+    };
+  }
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-red-800 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <span
+          className={[
+            "text-sm",
+            isMyTurn ? "font-bold text-red-800" : "text-stone-600",
+          ].join(" ")}
+        >
+          {statusText}
+        </span>
+        {action && (
+          <button
+            className="h-14 min-w-40 shrink-0 bg-red-800 px-8 text-lg font-bold text-white transition-transform active:scale-95 disabled:bg-stone-400 sm:min-w-56"
+            disabled={action.disabled}
+            onClick={action.onClick}
+            type="button"
+          >
+            {action.label}
+          </button>
+        )}
       </div>
     </div>
   );
