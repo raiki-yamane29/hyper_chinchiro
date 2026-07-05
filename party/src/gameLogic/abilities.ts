@@ -41,7 +41,7 @@ export const ABILITIES: Ability[] = [
   },
   {
     id: "trickster",
-    name: "イカサマ師",
+    name: "ラッキーツー",
     description: "2のウェイトを3倍にする",
     isActive: false,
     rarityWeight: 10,
@@ -110,7 +110,7 @@ export const ABILITIES: Ability[] = [
   },
   {
     id: "hifumi123",
-    name: "123賽",
+    name: "ヒフミ賽",
     description: "1・2・3の目しか出なくする",
     isActive: false,
     rarityWeight: 10,
@@ -119,7 +119,7 @@ export const ABILITIES: Ability[] = [
   {
     id: "gambler",
     name: "ギャンブラー",
-    description: "勝った時と負けた時の獲得ポイントが倍になる",
+    description: "自分が絡む精算のポイントの受け渡しが倍になる",
     isActive: false,
     rarityWeight: 3,
     applyWeights: (base) => cloneWeights(base),

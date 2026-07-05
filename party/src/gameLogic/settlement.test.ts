@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateHand } from "./handEvaluator";
 import {
+  applyGamblerMultiplier,
   compareRolls,
   createSettlement,
   getSettlementPoints,
@@ -143,5 +144,57 @@ describe("精算の向き (createSettlement)", () => {
       const s = createSettlement(banker, child, evaluateHand(b), evaluateHand(p));
       expect(s.bankerDelta + s.playerDelta).toBe(0);
     }
+  });
+});
+
+describe("ギャンブラーの倍加 (applyGamblerMultiplier)", () => {
+  const base = createSettlement(
+    banker,
+    child,
+    evaluateHand([4, 5, 6]), // 親456勝ち → 2pt
+    evaluateHand([6, 2, 2]),
+  );
+
+  it("ギャンブラー不在なら変化なし", () => {
+    expect(applyGamblerMultiplier(base, false, false)).toEqual(base);
+  });
+
+  it("親がギャンブラー: 受け渡し全体が2倍（子の支払いも2倍）", () => {
+    const s = applyGamblerMultiplier(base, true, false);
+    expect(s.bankerDelta).toBe(base.bankerDelta * 2);
+    expect(s.playerDelta).toBe(base.playerDelta * 2);
+    expect(s.points).toBe(base.points * 2);
+  });
+
+  it("子がギャンブラー: 受け渡し全体が2倍", () => {
+    const s = applyGamblerMultiplier(base, false, true);
+    expect(s.bankerDelta).toBe(base.bankerDelta * 2);
+    expect(s.playerDelta).toBe(base.playerDelta * 2);
+  });
+
+  it("両者ギャンブラー: 4倍", () => {
+    const s = applyGamblerMultiplier(base, true, true);
+    expect(s.bankerDelta).toBe(base.bankerDelta * 4);
+    expect(s.playerDelta).toBe(base.playerDelta * 4);
+  });
+
+  it("倍加後もゼロサムが保たれる", () => {
+    for (const [bg, pg] of [
+      [true, false],
+      [false, true],
+      [true, true],
+    ] as const) {
+      const s = applyGamblerMultiplier(base, bg, pg);
+      expect(s.bankerDelta + s.playerDelta).toBe(0);
+    }
+  });
+
+  it("精算理由にギャンブラー倍率が付記される", () => {
+    expect(applyGamblerMultiplier(base, true, false).reason).toContain(
+      "ギャンブラー2倍",
+    );
+    expect(applyGamblerMultiplier(base, true, true).reason).toContain(
+      "ギャンブラー4倍",
+    );
   });
 });

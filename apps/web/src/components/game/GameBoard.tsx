@@ -12,7 +12,7 @@ import type {
 
 const abilityNames: Record<string, string> = {
   lucky_one: "ラッキーワン",
-  trickster: "イカサマ師",
+  trickster: "ラッキーツー",
   lucky_three: "ラッキースリー",
   lucky_four: "ラッキーフォー",
   lucky_five: "ラッキーファイブ",
@@ -20,7 +20,7 @@ const abilityNames: Record<string, string> = {
   no_one: "ピンゾロ封じ",
   chaos: "カオスダイス",
   shigoro: "シゴロ賽",
-  hifumi123: "123賽",
+  hifumi123: "ヒフミ賽",
   gambler: "ギャンブラー",
   godhand: "神の一手",
   double_chance: "ダブルチャンス",
@@ -37,7 +37,7 @@ const abilityDescriptions: Record<string, string> = {
   chaos: "手番ごとにサイコロの重みがランダムに変わります。",
   shigoro: "4・5・6の目しか出なくなります。",
   hifumi123: "1・2・3の目しか出なくなります。",
-  gambler: "勝った時と負けた時の獲得ポイントが倍になります。",
+  gambler: "自分が絡む精算のポイントの受け渡しが倍になります。",
   godhand: "1ラウンド1回だけ、サイコロ1個を任意の目に固定できます。",
   double_chance: "役なし時の振り直し上限が1回増えます。",
 };

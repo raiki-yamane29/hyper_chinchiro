@@ -8,7 +8,7 @@ export const abilities = [
   },
   {
     id: "trickster",
-    name: "イカサマ師",
+    name: "ラッキーツー",
     description: "2の出目が出やすい",
   },
   {
@@ -48,13 +48,13 @@ export const abilities = [
   },
   {
     id: "hifumi123",
-    name: "123賽",
+    name: "ヒフミ賽",
     description: "1・2・3の目しか出ない",
   },
   {
     id: "gambler",
     name: "ギャンブラー",
-    description: "勝敗時の獲得ポイントが倍になる",
+    description: "自分が絡むポイントの受け渡しが倍",
   },
   {
     id: "godhand",

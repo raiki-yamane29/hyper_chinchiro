@@ -436,21 +436,11 @@ function finishRound(state: GameState): GameState {
     }
 
     const playerRoll = state.playerRolls[player.id];
-    const rawSettlement = createSettlement(
-      banker,
-      player,
-      state.bankerRoll,
-      playerRoll,
+    const settlement = applyGamblerMultiplier(
+      createSettlement(banker, player, state.bankerRoll, playerRoll),
+      getEffectiveAbilityId(state, banker) === "gambler",
+      getEffectiveAbilityId(state, player) === "gambler",
     );
-    const bankerMultiplier =
-      getEffectiveAbilityId(state, banker) === "gambler" ? 2 : 1;
-    const playerMultiplier =
-      getEffectiveAbilityId(state, player) === "gambler" ? 2 : 1;
-    const settlement: RoundSettlement = {
-      ...rawSettlement,
-      bankerDelta: rawSettlement.bankerDelta * bankerMultiplier,
-      playerDelta: rawSettlement.playerDelta * playerMultiplier,
-    };
     scores[banker.id] = (scores[banker.id] ?? 0) + settlement.bankerDelta;
     scores[player.id] = (scores[player.id] ?? 0) + settlement.playerDelta;
     roundSettlements[player.id] = settlement;
@@ -520,6 +510,27 @@ export function createSettlement(
     playerDelta,
     points,
     reason,
+  };
+}
+
+// ギャンブラーは「自分が絡む精算の受け渡し全体」を倍にする（両者が持つなら4倍）。
+// 双方の増減を同率で倍にするためゼロサム性が保たれる
+export function applyGamblerMultiplier(
+  settlement: RoundSettlement,
+  bankerIsGambler: boolean,
+  playerIsGambler: boolean,
+): RoundSettlement {
+  const multiplier = (bankerIsGambler ? 2 : 1) * (playerIsGambler ? 2 : 1);
+  if (multiplier === 1) {
+    return settlement;
+  }
+
+  return {
+    ...settlement,
+    points: settlement.points * multiplier,
+    bankerDelta: settlement.bankerDelta * multiplier,
+    playerDelta: settlement.playerDelta * multiplier,
+    reason: `${settlement.reason} × ギャンブラー${multiplier}倍`,
   };
 }
 
