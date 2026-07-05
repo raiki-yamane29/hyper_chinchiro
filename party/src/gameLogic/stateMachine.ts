@@ -7,13 +7,14 @@ import {
 } from "./abilities";
 import { rollWithWeights } from "./diceRoller";
 import { evaluateHand } from "./handEvaluator";
-import type {
-  AbilityMode,
-  ClientMessage,
-  GameState,
-  Player,
-  RoundSettlement,
-  RollResult,
+import {
+  DEBUG_KEY,
+  type AbilityMode,
+  type ClientMessage,
+  type GameState,
+  type Player,
+  type RoundSettlement,
+  type RollResult,
 } from "../types/game";
 
 const DEFAULT_MAX_ROUNDS = 5;
@@ -35,6 +36,7 @@ export function createInitialState(roomId: string): GameState {
     maxRounds: DEFAULT_MAX_ROUNDS,
     rollCountMap: {},
     currentTurnAbilityMap: {},
+    debugNextRolls: {},
   };
 }
 
@@ -62,6 +64,10 @@ export function applyMessage(
       return startNextRound(state);
     case "return_to_lobby":
       return returnToLobby(state);
+    case "debug_set_next_roll":
+      return debugSetNextRoll(state, msg.key, msg.playerId, msg.dice);
+    case "debug_set_ability":
+      return debugSetAbility(state, msg.key, msg.playerId, msg.abilityId);
     default:
       return state;
   }
@@ -77,10 +83,12 @@ export function removePlayer(state: GameState, playerId: string): GameState {
   const rollCountMap = { ...state.rollCountMap };
   const playerRolls = { ...state.playerRolls };
   const roundSettlements = { ...state.roundSettlements };
+  const debugNextRolls = { ...state.debugNextRolls };
   delete scores[playerId];
   delete rollCountMap[playerId];
   delete playerRolls[playerId];
   delete roundSettlements[playerId];
+  delete debugNextRolls[playerId];
 
   if (players.length < 2) {
     return {
@@ -95,6 +103,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
       bankerRoll: null,
       roundSettlements,
       currentTurnAbilityMap: {},
+      debugNextRolls,
     };
   }
 
@@ -105,6 +114,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
     rollCountMap,
     playerRolls,
     roundSettlements,
+    debugNextRolls,
     bankerIndex: clampIndex(state.bankerIndex, players.length),
     currentPlayerIndex: clampIndex(state.currentPlayerIndex, players.length),
   };
@@ -167,6 +177,61 @@ function joinGame(
     rollCountMap: {
       ...state.rollCountMap,
       [senderId]: 0,
+    },
+  };
+}
+
+function debugSetNextRoll(
+  state: GameState,
+  key: string,
+  playerId: string,
+  dice: [number, number, number],
+): GameState {
+  const isValidDice =
+    Array.isArray(dice) &&
+    dice.length === 3 &&
+    dice.every((v) => Number.isInteger(v) && v >= 1 && v <= 6);
+  if (key !== DEBUG_KEY || !isValidDice) {
+    return state;
+  }
+
+  if (!state.players.some((player) => player.id === playerId)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    debugNextRolls: {
+      ...state.debugNextRolls,
+      [playerId]: [dice[0], dice[1], dice[2]],
+    },
+  };
+}
+
+function debugSetAbility(
+  state: GameState,
+  key: string,
+  playerId: string,
+  abilityId: string,
+): GameState {
+  if (key !== DEBUG_KEY) {
+    return state;
+  }
+
+  if (!state.players.some((player) => player.id === playerId)) {
+    return state;
+  }
+
+  const ability = getAbility(abilityId);
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === playerId ? { ...player, abilityId: ability.id } : player,
+    ),
+    // ランダムモードでは手番割り当て済みの能力も上書きして即時反映する
+    currentTurnAbilityMap: {
+      ...state.currentTurnAbilityMap,
+      [playerId]: ability.id,
     },
   };
 }
@@ -250,7 +315,16 @@ function rollForCurrentTurn(
     return nextState;
   }
 
-  const roll = rollDiceForPlayer(activePlayer, abilityId, rollCount, pinnedValue);
+  const forcedDice = nextState.debugNextRolls[senderId];
+  let roll: RollResult;
+  if (forcedDice) {
+    roll = evaluateHand(forcedDice);
+    const debugNextRolls = { ...nextState.debugNextRolls };
+    delete debugNextRolls[senderId];
+    nextState = { ...nextState, debugNextRolls };
+  } else {
+    roll = rollDiceForPlayer(activePlayer, abilityId, rollCount, pinnedValue);
+  }
   const rollCountMap = { ...nextState.rollCountMap, [senderId]: rollCount };
   const players = nextState.players.map((player) =>
     player.id === senderId && isGodhandRoll

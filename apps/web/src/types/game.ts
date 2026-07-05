@@ -49,7 +49,12 @@ export interface GameState {
   maxRounds: number;
   rollCountMap: Record<string, number>;
   currentTurnAbilityMap: Record<string, string>;
+  /** デバッグ用: 次のロールで強制する出目（playerId → dice） */
+  debugNextRolls: Record<string, [number, number, number]>;
 }
+
+// デバッグページ/メッセージの共有シークレット（リンクを知らない人の操作を防ぐ）
+export const DEBUG_KEY = "hyper-debug-7f3xk2p9qz";
 
 export type ClientMessage =
   | {
@@ -62,7 +67,19 @@ export type ClientMessage =
   | { type: "roll" }
   | { type: "use_active_ability"; payload: { pinnedValue: number } }
   | { type: "next_round" }
-  | { type: "return_to_lobby" };
+  | { type: "return_to_lobby" }
+  | {
+      type: "debug_set_next_roll";
+      key: string;
+      playerId: string;
+      dice: [number, number, number];
+    }
+  | {
+      type: "debug_set_ability";
+      key: string;
+      playerId: string;
+      abilityId: string;
+    };
 
 export type ServerMessage =
   | { type: "state_update"; state: GameState }
