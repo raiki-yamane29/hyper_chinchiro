@@ -469,7 +469,7 @@ function finishRound(state: GameState): GameState {
   };
 }
 
-function compareRolls(
+export function compareRolls(
   bankerRoll: RollResult,
   playerRoll: RollResult | undefined,
 ): "banker" | "player" {
@@ -498,7 +498,7 @@ function compareRolls(
   return "banker";
 }
 
-function createSettlement(
+export function createSettlement(
   banker: Player,
   player: Player,
   bankerRoll: RollResult,
@@ -523,7 +523,7 @@ function createSettlement(
   };
 }
 
-function getSettlementPoints(
+export function getSettlementPoints(
   winnerRoll: RollResult | undefined,
   loserRoll: RollResult | undefined,
 ): { points: number; reason: string } {
