@@ -88,7 +88,7 @@ describe("ランダムモード: 賭け→能力発表→低い順に振る", ()
     expect(state.bets.Banker).toBeUndefined();
   });
 
-  it("全員分そろうまでは能力が発表されず、そろった時点で全員分の能力が決まり賭けの低い順で確定する", () => {
+  it("全員分そろうまでは能力が発表されず、そろった時点で子の能力だけが決まり賭けの低い順で確定する（親は自分の手番まで非公開）", () => {
     let state = setupRandomGame();
     state = applyMessage(state, { type: "set_max_bet", amount: 5 }, "Banker");
 
@@ -99,13 +99,30 @@ describe("ランダムモード: 賭け→能力発表→低い順に振る", ()
 
     state = applyMessage(state, { type: "set_bet", amount: 1 }, "ChildB");
 
-    // 全員分そろった → 全員の能力が決まり、賭けの低い順（ChildB→ChildA）で確定
+    // 全員分そろった → 子の能力が決まり、賭けの低い順（ChildB→ChildA）で確定
+    // 親の能力はまだ非公開（親の手番が来るまで発表されない）
     expect(state.phase).toBe("player_turn");
     expect(state.turnOrder).toEqual(["ChildB", "ChildA"]);
     expect(state.players[state.currentPlayerIndex].id).toBe("ChildB");
     expect(Object.keys(state.currentTurnAbilityMap).sort()).toEqual(
-      ["Banker", "ChildA", "ChildB"].sort(),
+      ["ChildA", "ChildB"].sort(),
     );
+    expect(state.currentTurnAbilityMap.Banker).toBeUndefined();
+  });
+
+  it("親の能力は親の手番（banker_turn）が始まるまで公開されない", () => {
+    let state = setupRandomGame();
+    state = applyMessage(state, { type: "set_max_bet", amount: 5 }, "Banker");
+    state = applyMessage(state, { type: "set_bet", amount: 2 }, "ChildA");
+    state = applyMessage(state, { type: "set_bet", amount: 1 }, "ChildB");
+
+    state = forceRoll(state, "ChildB", [3, 3, 4]);
+    expect(state.currentTurnAbilityMap.Banker).toBeUndefined();
+
+    state = forceRoll(state, "ChildA", [3, 3, 5]);
+    expect(state.phase).toBe("banker_turn");
+    // 親の手番になった瞬間に能力が公開される（振る前）
+    expect(state.currentTurnAbilityMap.Banker).toBeDefined();
   });
 
   it("賭けの低い順→親の順でロールが進行する", () => {

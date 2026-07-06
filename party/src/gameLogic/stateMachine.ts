@@ -315,8 +315,10 @@ function setBetDuringBettingPhase(
     phase: "player_turn",
     currentPlayerIndex,
   };
-  for (const player of state.players) {
-    revealed = ensureTurnAbility(revealed, player.id);
+  // 子の能力はここで一括発表。親の能力は親の手番（banker_turn）開始時に
+  // 別途 advanceToNextChildOrBanker 内の ensureTurnAbility で公開される
+  for (const child of children) {
+    revealed = ensureTurnAbility(revealed, child.id);
   }
   return revealed;
 }
