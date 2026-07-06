@@ -8,5 +8,4 @@ dist/
 .env*.local
 *.log
 .DS_Store
-CLAUDE.md
-syuusei.md
+.claude/
