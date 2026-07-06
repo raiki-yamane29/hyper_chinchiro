@@ -7,17 +7,19 @@ interface RoundHistoryProps {
 }
 
 export function RoundHistory({ state }: RoundHistoryProps) {
-  if (state.history.length === 0) {
+  // 旧バージョンのサーバーが返すstateにはhistoryが無いことがある
+  const history = state.history ?? [];
+  if (history.length === 0) {
     return null;
   }
 
   return (
     <details className="border border-stone-300 bg-white p-4 text-sm">
       <summary className="cursor-pointer font-bold">
-        ラウンド履歴 ({state.history.length})
+        ラウンド履歴 ({history.length})
       </summary>
       <div className="mt-3 grid gap-4">
-        {[...state.history].reverse().map((entry) => (
+        {[...history].reverse().map((entry) => (
           <RoundEntry entry={entry} key={entry.round} />
         ))}
       </div>

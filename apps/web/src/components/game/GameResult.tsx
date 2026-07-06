@@ -7,9 +7,14 @@ interface GameResultProps {
 }
 
 export function GameResult({ state }: GameResultProps) {
-  const ranking = [...state.players]
+  const sorted = [...state.players]
     .map((player) => ({ player, score: state.scores[player.id] ?? 0 }))
     .sort((a, b) => b.score - a.score);
+  // 同点は同順位（1,2,2,4形式）
+  const ranking = sorted.map((entry) => ({
+    ...entry,
+    rank: sorted.filter((other) => other.score > entry.score).length + 1,
+  }));
 
   return (
     <div className="mb-5 animate-[result-in_0.5s_ease-out] border-2 border-amber-500 bg-amber-50 p-5">
@@ -17,8 +22,8 @@ export function GameResult({ state }: GameResultProps) {
         ゲーム終了！
       </h2>
       <div className="grid gap-2">
-        {ranking.map(({ player, score }, index) => {
-          const isFirst = index === 0;
+        {ranking.map(({ player, score, rank }) => {
+          const isFirst = rank === 1;
           return (
             <div
               className={[
@@ -35,7 +40,7 @@ export function GameResult({ state }: GameResultProps) {
                   isFirst ? "text-lg font-bold" : "text-sm font-semibold",
                 ].join(" ")}
               >
-                <span className="text-stone-500">{index + 1}位</span>
+                <span className="text-stone-500">{rank}位</span>
                 {isFirst && <span aria-hidden>👑</span>}
                 {player.nickname}
               </span>

@@ -21,12 +21,20 @@ const GRACE_PERIOD_MS = 60_000;
 export class ChinchiroServer extends Server<Env> {
   private state: GameState = createInitialState("");
   private removalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // 同一ID（同一_pk）の生存接続数。再接続の確立後に旧接続のcloseが遅れて
+  // 届いても、接続中のプレイヤーを誤って切断扱いしないための判定に使う
+  private connectionCounts = new Map<string, number>();
 
   onStart() {
     this.state = createInitialState(this.name);
   }
 
   onConnect(conn: Connection) {
+    this.connectionCounts.set(
+      conn.id,
+      (this.connectionCounts.get(conn.id) ?? 0) + 1,
+    );
+
     const pendingTimer = this.removalTimers.get(conn.id);
     if (pendingTimer) {
       clearTimeout(pendingTimer);
@@ -65,6 +73,13 @@ export class ChinchiroServer extends Server<Env> {
   }
 
   onClose(conn: Connection) {
+    const remaining = Math.max(0, (this.connectionCounts.get(conn.id) ?? 1) - 1);
+    if (remaining > 0) {
+      this.connectionCounts.set(conn.id, remaining);
+      return;
+    }
+    this.connectionCounts.delete(conn.id);
+
     if (!this.state.players.some((player) => player.id === conn.id)) {
       return;
     }

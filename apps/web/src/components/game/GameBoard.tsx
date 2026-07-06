@@ -77,7 +77,9 @@ export function GameBoard({
     isMyTurn &&
     state?.phase === "player_turn" &&
     (state.rollCountMap[self!.id] ?? 0) === 0;
-  const currentBet = self ? (state?.bets[self.id] ?? 1) : 1;
+  // bets/history は旧バージョンのサーバーが返すstateに存在しないことがある
+  // （フロント先行デプロイ時）ためオプショナルアクセスにする
+  const currentBet = self ? (state?.bets?.[self.id] ?? 1) : 1;
 
   const announcement = useAbilityAnnouncement(state, self, activePlayer, activeTurnAbilityId);
 
@@ -173,7 +175,7 @@ export function GameBoard({
           .filter((player) => player.id !== banker?.id)
           .map((player) => (
             <RollPanel
-              bet={state.bets[player.id]}
+              bet={state.bets?.[player.id]}
               isActive={activePlayer?.id === player.id}
               isBanker={false}
               key={player.id}
