@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { AbilitySelector } from "@/components/lobby/AbilitySelector";
 import { GameBoard } from "@/components/game/GameBoard";
 import { PlayerList } from "@/components/game/PlayerList";
+import { RoundHistory } from "@/components/game/RoundHistory";
+import { RulesModal } from "@/components/ui/RulesModal";
 import { useGameState } from "@/hooks/useGameState";
 import { usePartySocket } from "@/hooks/usePartySocket";
 import type { AbilityMode } from "@/types/game";
@@ -21,6 +23,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const [abilityId, setAbilityId] = useState(initialAbility);
   const [selectedAbilityMode, setSelectedAbilityMode] =
     useState<AbilityMode>("random_turn");
+  const [selectedRoundsPerPlayer, setSelectedRoundsPerPlayer] = useState(1);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
@@ -31,6 +34,9 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const effectiveAbilityMode = roomHasPlayers
     ? (state?.abilityMode ?? "random_turn")
     : selectedAbilityMode;
+  const effectiveRoundsPerPlayer = roomHasPlayers
+    ? (state?.roundsPerPlayer ?? 1)
+    : selectedRoundsPerPlayer;
 
   const me = useMemo(() => {
     if (!state || !socket) {
@@ -64,7 +70,10 @@ export function RoomClient({ roomId }: RoomClientProps) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pt-8 pb-32 sm:px-6">
         <header className="flex flex-col gap-4 border-b border-stone-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-normal">Hyper Chinchiro</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-normal">Hyper Chinchiro</h1>
+              <RulesModal />
+            </div>
             <p className="mt-1 text-sm text-stone-600">接続: {status}</p>
           </div>
           <div className="grid gap-2 border-2 border-red-800 bg-white p-3 shadow-sm sm:min-w-80">
@@ -100,6 +109,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
                 nickname,
                 abilityId,
                 abilityMode: effectiveAbilityMode,
+                roundsPerPlayer: effectiveRoundsPerPlayer,
               });
             }}
           >
@@ -166,6 +176,24 @@ export function RoomClient({ roomId }: RoomClientProps) {
                   </label>
                 </div>
               </fieldset>
+              <label className="grid content-start gap-2 text-sm font-medium">
+                ラウンド数
+                <select
+                  className={[
+                    "h-11 border border-stone-300 bg-white px-3 text-base outline-none focus:border-red-700",
+                    isLobbyPhase ? "" : "cursor-not-allowed opacity-70",
+                  ].join(" ")}
+                  disabled={!isLobbyPhase}
+                  onChange={(event) =>
+                    setSelectedRoundsPerPlayer(Number(event.target.value))
+                  }
+                  value={effectiveRoundsPerPlayer}
+                >
+                  <option value={1}>人数×1（全員が親を1回）</option>
+                  <option value={2}>人数×2</option>
+                  <option value={3}>人数×3</option>
+                </select>
+              </label>
               {effectiveAbilityMode === "selected" ? (
                 <AbilitySelector value={abilityId} onChange={setAbilityId} />
               ) : (
@@ -204,13 +232,17 @@ export function RoomClient({ roomId }: RoomClientProps) {
             onReady={() => send({ type: "ready" })}
             onReturnToLobby={() => send({ type: "return_to_lobby" })}
             onRoll={() => send({ type: "roll" })}
+            onSetBet={(amount) => send({ type: "set_bet", amount })}
             onUseGodhand={(pinnedValue) =>
               send({ type: "use_active_ability", payload: { pinnedValue } })
             }
             self={me}
             state={state}
           />
-          <PlayerList selfId={socket?.id} state={state} />
+          <div className="grid gap-4 content-start">
+            <PlayerList selfId={socket?.id} state={state} />
+            {state && <RoundHistory state={state} />}
+          </div>
         </section>
       </div>
     </main>

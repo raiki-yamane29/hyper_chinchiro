@@ -25,17 +25,65 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-@keyframes dice-wobble {
+@keyframes dice-tumble {
   0% {
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
-  35% {
-    transform: translateY(-6px) rotate(-6deg);
+  20% {
+    transform: translateY(-10px) rotate(-25deg) scale(1.05);
   }
-  70% {
-    transform: translateY(2px) rotate(4deg);
+  40% {
+    transform: translateY(2px) rotate(20deg) scale(0.95);
+  }
+  60% {
+    transform: translateY(-6px) rotate(-15deg) scale(1.05);
+  }
+  80% {
+    transform: translateY(1px) rotate(8deg) scale(1);
   }
   100% {
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes fade-in-out {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes result-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crown-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
   }
 }

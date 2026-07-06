@@ -47,6 +47,11 @@ export function PlayerList({ state, selfId }: PlayerListProps) {
                 {isBanker && <span>親</span>}
                 {isActive && <span>手番</span>}
                 <span>{player.isReady ? "ready" : "waiting"}</span>
+                {player.connected === false && (
+                  <span className="border border-amber-500 bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">
+                    切断中
+                  </span>
+                )}
                 {abilityId && (
                   <span>
                     {state?.abilityMode === "random_turn" ? "今: " : ""}

@@ -12,9 +12,10 @@ const handLabels: Record<RollResult["hand"], string> = {
 
 interface HandResultProps {
   roll: RollResult | null;
+  remaining?: number;
 }
 
-export function HandResult({ roll }: HandResultProps) {
+export function HandResult({ roll, remaining }: HandResultProps) {
   if (!roll) {
     return <p className="mt-2 text-sm text-stone-500">未ロール</p>;
   }
@@ -24,7 +25,7 @@ export function HandResult({ roll }: HandResultProps) {
       <span className="font-semibold">{formatHand(roll)}</span>
       {!roll.isValid && (
         <span className="border border-amber-500 px-2 py-0.5 text-amber-700">
-          振り直し可
+          振り直し可{remaining !== undefined ? `（あと${remaining}回）` : ""}
         </span>
       )}
     </div>
