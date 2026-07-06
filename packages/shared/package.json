@@ -1,0 +1,9 @@
+{
+  "name": "@hyper-chinchiro/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/game.ts"
+  }
+}

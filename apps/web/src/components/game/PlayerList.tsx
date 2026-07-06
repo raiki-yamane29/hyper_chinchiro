@@ -1,22 +1,10 @@
 "use client";
 
-import type { GameState } from "@/types/game";
+import { ABILITY_INFO, type GameState } from "@/types/game";
 
-const abilityNames: Record<string, string> = {
-  lucky_one: "ラッキーワン",
-  trickster: "ラッキーツー",
-  lucky_three: "ラッキースリー",
-  lucky_four: "ラッキーフォー",
-  lucky_five: "ラッキーファイブ",
-  lucky_six: "ラッキーシックス",
-  no_one: "ピンゾロ封じ",
-  chaos: "カオスダイス",
-  shigoro: "シゴロ賽",
-  hifumi123: "ヒフミ賽",
-  gambler: "ギャンブラー",
-  godhand: "神の一手",
-  double_chance: "ダブルチャンス",
-};
+const abilityNames: Record<string, string> = Object.fromEntries(
+  ABILITY_INFO.map((ability) => [ability.id, ability.name]),
+);
 
 interface PlayerListProps {
   state: GameState | null;

@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@hyper-chinchiro/shared": "*",
     "nanoid": "^5.1.16",
     "next": "16.2.9",
     "partysocket": "^1.3.0",

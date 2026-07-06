@@ -14,6 +14,7 @@ const banker: Player = {
   abilityId: "trickster",
   abilityUsedThisRound: false,
   isReady: true,
+  connected: true,
 };
 
 const child: Player = {
@@ -22,6 +23,7 @@ const child: Player = {
   abilityId: "trickster",
   abilityUsedThisRound: false,
   isReady: true,
+  connected: true,
 };
 
 describe("勝敗判定 (compareRolls)", () => {

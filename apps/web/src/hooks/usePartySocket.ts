@@ -1,10 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nanoid } from "nanoid";
 import PartySocket from "partysocket";
 
 interface UsePartySocketOptions {
   roomId: string;
+}
+
+function getPersistedConnectionId(roomId: string): string {
+  const storageKey = `hyper-chinchiro-pk:${roomId}`;
+  const existing = sessionStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const id = nanoid();
+  sessionStorage.setItem(storageKey, id);
+  return id;
 }
 
 export function usePartySocket({ roomId }: UsePartySocketOptions) {
@@ -25,6 +38,7 @@ export function usePartySocket({ roomId }: UsePartySocketOptions) {
       // partyserver 側の Durable Object バインディング名（ChinchiroServer）の kebab-case
       party: "chinchiro-server",
       room: roomId,
+      id: getPersistedConnectionId(roomId),
     });
 
     const handleOpen = () => setStatus("open");

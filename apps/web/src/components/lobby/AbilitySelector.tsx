@@ -1,72 +1,8 @@
 "use client";
 
-export const abilities = [
-  {
-    id: "lucky_one",
-    name: "ラッキーワン",
-    description: "1の出目が出やすい",
-  },
-  {
-    id: "trickster",
-    name: "ラッキーツー",
-    description: "2の出目が出やすい",
-  },
-  {
-    id: "lucky_three",
-    name: "ラッキースリー",
-    description: "3の出目が出やすい",
-  },
-  {
-    id: "lucky_four",
-    name: "ラッキーフォー",
-    description: "4の出目が出やすい",
-  },
-  {
-    id: "lucky_five",
-    name: "ラッキーファイブ",
-    description: "5の出目が出やすい",
-  },
-  {
-    id: "lucky_six",
-    name: "ラッキーシックス",
-    description: "6の出目が出やすい",
-  },
-  {
-    id: "no_one",
-    name: "ピンゾロ封じ",
-    description: "1の出目を抑える",
-  },
-  {
-    id: "chaos",
-    name: "カオスダイス",
-    description: "毎回ウェイトが変わる",
-  },
-  {
-    id: "shigoro",
-    name: "シゴロ賽",
-    description: "4・5・6の目しか出ない",
-  },
-  {
-    id: "hifumi123",
-    name: "ヒフミ賽",
-    description: "1・2・3の目しか出ない",
-  },
-  {
-    id: "gambler",
-    name: "ギャンブラー",
-    description: "自分が絡むポイントの受け渡しが倍",
-  },
-  {
-    id: "godhand",
-    name: "神の一手",
-    description: "1ラウンド1回だけ1個固定",
-  },
-  {
-    id: "double_chance",
-    name: "ダブルチャンス",
-    description: "役なしの振り直しが1回増える",
-  },
-] as const;
+import { ABILITY_INFO } from "@/types/game";
+
+export const abilities = ABILITY_INFO;
 
 interface AbilitySelectorProps {
   value: string;

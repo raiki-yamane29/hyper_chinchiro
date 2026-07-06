@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hyper-chinchiro/shared": "*",
     "partyserver": "^0.5.8"
   },
   "devDependencies": {

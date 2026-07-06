@@ -19,12 +19,14 @@ import {
 
 const DEFAULT_MAX_ROUNDS = 5;
 const DEFAULT_MAX_ROLLS = 3;
+const DEFAULT_BET = 1;
 
 export function createInitialState(roomId: string): GameState {
   return {
     phase: "lobby",
     roomId,
     abilityMode: "selected",
+    roundsPerPlayer: 1,
     players: [],
     bankerIndex: 0,
     currentPlayerIndex: 0,
@@ -32,10 +34,12 @@ export function createInitialState(roomId: string): GameState {
     playerRolls: {},
     roundSettlements: {},
     scores: {},
+    bets: {},
     round: 1,
     maxRounds: DEFAULT_MAX_ROUNDS,
     rollCountMap: {},
     currentTurnAbilityMap: {},
+    history: [],
     debugNextRolls: {},
   };
 }
@@ -53,6 +57,7 @@ export function applyMessage(
         msg.abilityId,
         senderId,
         msg.abilityMode,
+        msg.roundsPerPlayer,
       );
     case "ready":
       return markReady(state, senderId);
@@ -60,6 +65,8 @@ export function applyMessage(
       return rollForCurrentTurn(state, senderId);
     case "use_active_ability":
       return rollForCurrentTurn(state, senderId, msg.payload.pinnedValue);
+    case "set_bet":
+      return setBet(state, senderId, msg.amount);
     case "next_round":
       return startNextRound(state);
     case "return_to_lobby":
@@ -84,11 +91,13 @@ export function removePlayer(state: GameState, playerId: string): GameState {
   const playerRolls = { ...state.playerRolls };
   const roundSettlements = { ...state.roundSettlements };
   const debugNextRolls = { ...state.debugNextRolls };
+  const bets = { ...state.bets };
   delete scores[playerId];
   delete rollCountMap[playerId];
   delete playerRolls[playerId];
   delete roundSettlements[playerId];
   delete debugNextRolls[playerId];
+  delete bets[playerId];
 
   if (players.length < 2) {
     return {
@@ -104,6 +113,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
       roundSettlements,
       currentTurnAbilityMap: {},
       debugNextRolls,
+      bets,
     };
   }
 
@@ -115,8 +125,26 @@ export function removePlayer(state: GameState, playerId: string): GameState {
     playerRolls,
     roundSettlements,
     debugNextRolls,
+    bets,
     bankerIndex: clampIndex(state.bankerIndex, players.length),
     currentPlayerIndex: clampIndex(state.currentPlayerIndex, players.length),
+  };
+}
+
+export function setPlayerConnected(
+  state: GameState,
+  playerId: string,
+  connected: boolean,
+): GameState {
+  if (!state.players.some((player) => player.id === playerId)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === playerId ? { ...player, connected } : player,
+    ),
   };
 }
 
@@ -126,6 +154,7 @@ function joinGame(
   abilityId: string,
   senderId: string,
   abilityMode?: AbilityMode,
+  roundsPerPlayer?: number,
 ): GameState {
   const cleanNickname = nickname.trim().slice(0, 24) || "名無し";
   const ability = getAbility(abilityId);
@@ -134,11 +163,16 @@ function joinGame(
     state.phase === "lobby" && isAbilityMode(abilityMode)
       ? abilityMode
       : state.abilityMode;
+  const nextRoundsPerPlayer =
+    state.phase === "lobby" && isValidRoundsPerPlayer(roundsPerPlayer)
+      ? roundsPerPlayer
+      : state.roundsPerPlayer;
 
   if (existing) {
     return {
       ...state,
       abilityMode: nextAbilityMode,
+      roundsPerPlayer: nextRoundsPerPlayer,
       phase: state.phase === "lobby" ? "ability_select" : state.phase,
       players: state.players.map((player) =>
         player.id === senderId
@@ -147,6 +181,7 @@ function joinGame(
               nickname: cleanNickname,
               abilityId: ability.id,
               isReady: false,
+              connected: true,
             }
           : player,
       ),
@@ -163,11 +198,13 @@ function joinGame(
     abilityId: ability.id,
     abilityUsedThisRound: false,
     isReady: false,
+    connected: true,
   };
 
   return {
     ...state,
     abilityMode: nextAbilityMode,
+    roundsPerPlayer: nextRoundsPerPlayer,
     phase: "ability_select",
     players: [...state.players, player],
     scores: {
@@ -178,6 +215,27 @@ function joinGame(
       ...state.rollCountMap,
       [senderId]: 0,
     },
+  };
+}
+
+function setBet(state: GameState, senderId: string, amount: number): GameState {
+  if (state.phase !== "player_turn") {
+    return state;
+  }
+  const activePlayer = state.players[state.currentPlayerIndex];
+  if (!activePlayer || activePlayer.id !== senderId) {
+    return state;
+  }
+  if ((state.rollCountMap[senderId] ?? 0) !== 0) {
+    return state;
+  }
+  if (!Number.isInteger(amount) || amount < 1 || amount > 3) {
+    return state;
+  }
+
+  return {
+    ...state,
+    bets: { ...state.bets, [senderId]: amount },
   };
 }
 
@@ -250,11 +308,13 @@ function returnToLobby(state: GameState): GameState {
     playerRolls: {},
     roundSettlements: {},
     scores: Object.fromEntries(state.players.map((player) => [player.id, 0])),
+    bets: {},
     round: 1,
     rollCountMap: Object.fromEntries(
       state.players.map((player) => [player.id, 0]),
     ),
     currentTurnAbilityMap: {},
+    history: [],
     players: state.players.map((player) => ({
       ...player,
       abilityUsedThisRound: false,
@@ -281,6 +341,7 @@ function markReady(state: GameState, senderId: string): GameState {
       ...state,
       players,
       phase: "player_turn",
+      maxRounds: players.length * state.roundsPerPlayer,
     });
   }
 
@@ -392,6 +453,7 @@ function resetRound(state: GameState): GameState {
     playerRolls: {},
     roundSettlements: {},
     rollCountMap,
+    bets: {},
     currentTurnAbilityMap: {},
     players: state.players.map((player) => ({
       ...player,
@@ -510,8 +572,12 @@ function finishRound(state: GameState): GameState {
     }
 
     const playerRoll = state.playerRolls[player.id];
+    const bet = state.bets[player.id] ?? DEFAULT_BET;
     const settlement = applyGamblerMultiplier(
-      createSettlement(banker, player, state.bankerRoll, playerRoll),
+      applyBetMultiplier(
+        createSettlement(banker, player, state.bankerRoll, playerRoll),
+        bet,
+      ),
       getEffectiveAbilityId(state, banker) === "gambler",
       getEffectiveAbilityId(state, player) === "gambler",
     );
@@ -521,6 +587,19 @@ function finishRound(state: GameState): GameState {
   }
 
   const isGameOver = state.round >= state.maxRounds;
+  const historyEntry = {
+    round: state.round,
+    bankerId: banker.id,
+    nicknames: Object.fromEntries(
+      state.players.map((player) => [player.id, player.nickname]),
+    ),
+    rolls: {
+      ...state.playerRolls,
+      [banker.id]: state.bankerRoll,
+    },
+    settlements: roundSettlements,
+  };
+
   return {
     ...state,
     scores,
@@ -530,6 +609,25 @@ function finishRound(state: GameState): GameState {
       ? state.players.map((player) => ({ ...player, isReady: false }))
       : state.players,
     currentTurnAbilityMap: {},
+    history: [...state.history, historyEntry],
+  };
+}
+
+// 賭け金1〜3ptは精算全体（親・子の増減）に同率で乗算する。1ptなら不変
+export function applyBetMultiplier(
+  settlement: RoundSettlement,
+  bet: number,
+): RoundSettlement {
+  if (bet <= 1) {
+    return settlement;
+  }
+
+  return {
+    ...settlement,
+    points: settlement.points * bet,
+    bankerDelta: settlement.bankerDelta * bet,
+    playerDelta: settlement.playerDelta * bet,
+    reason: `賭け${bet}pt × ${settlement.reason}`,
   };
 }
 
@@ -681,13 +779,24 @@ function markRematchReady(state: GameState, senderId: string): GameState {
       playerRolls: {},
       roundSettlements: {},
       scores: Object.fromEntries(players.map((player) => [player.id, 0])),
+      bets: {},
       round: 1,
       rollCountMap: Object.fromEntries(players.map((player) => [player.id, 0])),
       currentTurnAbilityMap: {},
+      history: [],
     };
   }
 
   return { ...state, players };
+}
+
+function isValidRoundsPerPlayer(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 3
+  );
 }
 
 function ensureTurnAbility(state: GameState, playerId?: string): GameState {

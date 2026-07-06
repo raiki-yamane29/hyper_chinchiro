@@ -3,44 +3,21 @@
 import { useState } from "react";
 import { DiceDisplay } from "./DiceDisplay";
 import { HandResult } from "./HandResult";
-import type {
-  GameState,
-  Player,
-  RollResult,
-  RoundSettlement,
+import {
+  ABILITY_INFO,
+  type GameState,
+  type Player,
+  type RollResult,
+  type RoundSettlement,
 } from "@/types/game";
 
-const abilityNames: Record<string, string> = {
-  lucky_one: "ラッキーワン",
-  trickster: "ラッキーツー",
-  lucky_three: "ラッキースリー",
-  lucky_four: "ラッキーフォー",
-  lucky_five: "ラッキーファイブ",
-  lucky_six: "ラッキーシックス",
-  no_one: "ピンゾロ封じ",
-  chaos: "カオスダイス",
-  shigoro: "シゴロ賽",
-  hifumi123: "ヒフミ賽",
-  gambler: "ギャンブラー",
-  godhand: "神の一手",
-  double_chance: "ダブルチャンス",
-};
+const abilityNames: Record<string, string> = Object.fromEntries(
+  ABILITY_INFO.map((ability) => [ability.id, ability.name]),
+);
 
-const abilityDescriptions: Record<string, string> = {
-  lucky_one: "1の出目が出やすくなります。",
-  trickster: "2の出目が出やすくなります。",
-  lucky_three: "3の出目が出やすくなります。",
-  lucky_four: "4の出目が出やすくなります。",
-  lucky_five: "5の出目が出やすくなります。",
-  lucky_six: "6の出目が出やすくなります。",
-  no_one: "1の出目を抑えて、ピンゾロやヒフミに寄りにくくします。",
-  chaos: "手番ごとにサイコロの重みがランダムに変わります。",
-  shigoro: "4・5・6の目しか出なくなります。",
-  hifumi123: "1・2・3の目しか出なくなります。",
-  gambler: "自分が絡む精算のポイントの受け渡しが倍になります。",
-  godhand: "1ラウンド1回だけ、サイコロ1個を任意の目に固定できます。",
-  double_chance: "役なし時の振り直し上限が1回増えます。",
-};
+const abilityDescriptions: Record<string, string> = Object.fromEntries(
+  ABILITY_INFO.map((ability) => [ability.id, ability.description]),
+);
 
 interface GameBoardProps {
   state: GameState | null;

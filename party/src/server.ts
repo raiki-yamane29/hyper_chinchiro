@@ -8,6 +8,7 @@ import {
   applyMessage,
   createInitialState,
   removePlayer,
+  setPlayerConnected,
 } from "./gameLogic/stateMachine";
 import type { ClientMessage, GameState, RollResult, ServerMessage } from "./types/game";
 
@@ -15,14 +16,28 @@ type Env = {
   ChinchiroServer: DurableObjectNamespace;
 };
 
+const GRACE_PERIOD_MS = 60_000;
+
 export class ChinchiroServer extends Server<Env> {
   private state: GameState = createInitialState("");
+  private removalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   onStart() {
     this.state = createInitialState(this.name);
   }
 
   onConnect(conn: Connection) {
+    const pendingTimer = this.removalTimers.get(conn.id);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.removalTimers.delete(conn.id);
+    }
+
+    if (this.state.players.some((player) => player.id === conn.id)) {
+      this.state = setPlayerConnected(this.state, conn.id, true);
+      this.broadcastMessage({ type: "state_update", state: this.state });
+    }
+
     this.send(conn, { type: "state_update", state: this.state });
   }
 
@@ -50,8 +65,19 @@ export class ChinchiroServer extends Server<Env> {
   }
 
   onClose(conn: Connection) {
-    this.state = removePlayer(this.state, conn.id);
+    if (!this.state.players.some((player) => player.id === conn.id)) {
+      return;
+    }
+
+    this.state = setPlayerConnected(this.state, conn.id, false);
     this.broadcastMessage({ type: "state_update", state: this.state });
+
+    const timer = setTimeout(() => {
+      this.removalTimers.delete(conn.id);
+      this.state = removePlayer(this.state, conn.id);
+      this.broadcastMessage({ type: "state_update", state: this.state });
+    }, GRACE_PERIOD_MS);
+    this.removalTimers.set(conn.id, timer);
   }
 
   private parseClientMessage(message: string): ClientMessage | null {

@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/web",
-    "party"
+    "party",
+    "packages/*"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w apps/web\" \"npm run dev -w party\"",
