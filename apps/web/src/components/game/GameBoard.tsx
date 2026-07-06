@@ -35,6 +35,7 @@ interface GameBoardProps {
   onReady: () => void;
   onRoll: () => void;
   onSetBet: (amount: number) => void;
+  onSetMaxBet: (amount: number) => void;
   onUseGodhand: (pinnedValue: number) => void;
   onNextRound: () => void;
   onReturnToLobby: () => void;
@@ -47,6 +48,7 @@ export function GameBoard({
   onReady,
   onRoll,
   onSetBet,
+  onSetMaxBet,
   onUseGodhand,
   onNextRound,
   onReturnToLobby,
@@ -72,14 +74,24 @@ export function GameBoard({
         0,
       )
     : 0;
-  const canBet =
-    Boolean(self) &&
-    isMyTurn &&
-    state?.phase === "player_turn" &&
-    (state.rollCountMap[self!.id] ?? 0) === 0;
+  const isRandomMode = state?.abilityMode === "random_turn";
+  const isBanker = Boolean(self && banker?.id === self.id);
+  const canDeclareMaxBet =
+    Boolean(self) && isBanker && state?.phase === "banker_max_bet";
+  const hasSubmittedBet = Boolean(self && state?.bets?.[self.id] !== undefined);
+  const canBet = isRandomMode
+    ? Boolean(self) &&
+      !isBanker &&
+      state?.phase === "betting" &&
+      !hasSubmittedBet
+    : Boolean(self) &&
+      isMyTurn &&
+      state?.phase === "player_turn" &&
+      (state?.rollCountMap[self!.id] ?? 0) === 0;
   // bets/history は旧バージョンのサーバーが返すstateに存在しないことがある
   // （フロント先行デプロイ時）ためオプショナルアクセスにする
   const currentBet = self ? (state?.bets?.[self.id] ?? 1) : 1;
+  const maxBet = state?.maxBet ?? 3;
 
   const announcement = useAbilityAnnouncement(state, self, activePlayer, activeTurnAbilityId);
 
@@ -176,6 +188,7 @@ export function GameBoard({
           .map((player) => (
             <RollPanel
               bet={state.bets?.[player.id]}
+              hideBetAmount={state.phase === "betting"}
               isActive={activePlayer?.id === player.id}
               isBanker={false}
               key={player.id}
@@ -193,16 +206,19 @@ export function GameBoard({
         <ActionBar
           activePlayer={activePlayer}
           canBet={canBet}
+          canDeclareMaxBet={canDeclareMaxBet}
           canRoll={canRoll}
           currentBet={currentBet}
           isGameOver={isGameOver}
           isMyTurn={isMyTurn}
+          maxBet={maxBet}
           maxRolls={getMaxRolls(activeAbilityId)}
           onNextRound={onNextRound}
           onReady={onReady}
           onReturnToLobby={onReturnToLobby}
           onRoll={onRoll}
           onSetBet={onSetBet}
+          onSetMaxBet={onSetMaxBet}
           phase={state?.phase ?? null}
           rollCount={self ? (state?.rollCountMap[self.id] ?? 0) : 0}
           self={self}
@@ -252,32 +268,38 @@ function useAbilityAnnouncement(
 function ActionBar({
   activePlayer,
   canBet,
+  canDeclareMaxBet,
   canRoll,
   currentBet,
   isGameOver,
   isMyTurn,
+  maxBet,
   maxRolls,
   onNextRound,
   onReady,
   onReturnToLobby,
   onRoll,
   onSetBet,
+  onSetMaxBet,
   phase,
   rollCount,
   self,
 }: {
   activePlayer: Player | null;
   canBet: boolean;
+  canDeclareMaxBet: boolean;
   canRoll: boolean;
   currentBet: number;
   isGameOver: boolean;
   isMyTurn: boolean;
+  maxBet: number;
   maxRolls: number;
   onNextRound: () => void;
   onReady: () => void;
   onReturnToLobby: () => void;
   onRoll: () => void;
   onSetBet: (amount: number) => void;
+  onSetMaxBet: (amount: number) => void;
   phase: GameState["phase"] | null;
   rollCount: number;
   self: Player;
@@ -295,6 +317,16 @@ function ActionBar({
       onClick: onReady,
       disabled: self.isReady,
     };
+  } else if (phase === "banker_max_bet") {
+    statusText = canDeclareMaxBet
+      ? "賭けの上限を決めてください（決めた後は能力が発表されます）"
+      : `${activePlayer?.nickname ?? "親"}が賭けの上限を決めています…`;
+  } else if (phase === "betting") {
+    statusText = canBet
+      ? "賭け金を決めてください（他のプレイヤーには見えません）"
+      : self.id === activePlayer?.id
+        ? "子の賭け確定を待っています…"
+        : "他のプレイヤーの賭け確定を待っています…";
   } else if (phase === "banker_turn" || phase === "player_turn") {
     if (isMyTurn) {
       statusText =
@@ -334,24 +366,15 @@ function ActionBar({
           {statusText}
         </span>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {canDeclareMaxBet && (
+            <MaxBetInput onSetMaxBet={onSetMaxBet} />
+          )}
           {canBet && (
-            <div className="flex items-center gap-1 border border-stone-300 bg-white p-1">
-              {[1, 2, 3].map((amount) => (
-                <button
-                  className={[
-                    "h-10 w-14 text-sm font-semibold transition",
-                    currentBet === amount
-                      ? "bg-red-800 text-white"
-                      : "bg-white text-stone-700 hover:bg-stone-100",
-                  ].join(" ")}
-                  key={amount}
-                  onClick={() => onSetBet(amount)}
-                  type="button"
-                >
-                  {amount}pt
-                </button>
-              ))}
-            </div>
+            <BetPicker
+              currentBet={currentBet}
+              maxBet={maxBet}
+              onSetBet={onSetBet}
+            />
           )}
           {isGameOver && (
             <button
@@ -378,8 +401,104 @@ function ActionBar({
   );
 }
 
+function MaxBetInput({
+  onSetMaxBet,
+}: {
+  onSetMaxBet: (amount: number) => void;
+}) {
+  const [amount, setAmount] = useState(3);
+
+  return (
+    <div className="flex items-center gap-2 border border-stone-300 bg-white p-1">
+      <input
+        className="h-10 w-16 border border-stone-300 px-2 text-center text-sm"
+        max={99}
+        min={1}
+        onChange={(event) => setAmount(Number(event.target.value))}
+        type="number"
+        value={amount}
+      />
+      <button
+        className="h-10 bg-red-800 px-4 text-sm font-semibold text-white disabled:bg-stone-400"
+        disabled={!Number.isInteger(amount) || amount < 1}
+        onClick={() => onSetMaxBet(amount)}
+        type="button"
+      >
+        上限を決定
+      </button>
+    </div>
+  );
+}
+
+function BetPicker({
+  currentBet,
+  maxBet,
+  onSetBet,
+}: {
+  currentBet: number;
+  maxBet: number;
+  onSetBet: (amount: number) => void;
+}) {
+  if (maxBet <= 6) {
+    const options = Array.from({ length: maxBet }, (_, i) => i + 1);
+    return (
+      <div className="flex items-center gap-1 border border-stone-300 bg-white p-1">
+        {options.map((amount) => (
+          <button
+            className={[
+              "h-10 w-14 text-sm font-semibold transition",
+              currentBet === amount
+                ? "bg-red-800 text-white"
+                : "bg-white text-stone-700 hover:bg-stone-100",
+            ].join(" ")}
+            key={amount}
+            onClick={() => onSetBet(amount)}
+            type="button"
+          >
+            {amount}pt
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return <BetNumberInput maxBet={maxBet} onSetBet={onSetBet} />;
+}
+
+function BetNumberInput({
+  maxBet,
+  onSetBet,
+}: {
+  maxBet: number;
+  onSetBet: (amount: number) => void;
+}) {
+  const [amount, setAmount] = useState(1);
+
+  return (
+    <div className="flex items-center gap-2 border border-stone-300 bg-white p-1">
+      <input
+        className="h-10 w-16 border border-stone-300 px-2 text-center text-sm"
+        max={maxBet}
+        min={1}
+        onChange={(event) => setAmount(Number(event.target.value))}
+        type="number"
+        value={amount}
+      />
+      <button
+        className="h-10 bg-red-800 px-4 text-sm font-semibold text-white disabled:bg-stone-400"
+        disabled={!Number.isInteger(amount) || amount < 1 || amount > maxBet}
+        onClick={() => onSetBet(amount)}
+        type="button"
+      >
+        賭けを確定
+      </button>
+    </div>
+  );
+}
+
 function RollPanel({
   bet,
+  hideBetAmount,
   isActive,
   isBanker,
   player,
@@ -391,6 +510,7 @@ function RollPanel({
   state,
 }: {
   bet?: number;
+  hideBetAmount?: boolean;
   isActive: boolean;
   isBanker: boolean;
   player: Player | null;
@@ -425,7 +545,12 @@ function RollPanel({
           )}
         </h2>
         <div className="flex items-center gap-2 text-xs text-stone-500">
-          {!isBanker && bet && bet > 1 && (
+          {!isBanker && hideBetAmount && bet !== undefined && (
+            <span className="border border-stone-300 bg-stone-50 px-2 py-0.5 font-semibold text-stone-600">
+              賭け確定済み
+            </span>
+          )}
+          {!isBanker && !hideBetAmount && bet && bet > 1 && (
             <span className="border border-red-300 bg-red-50 px-2 py-0.5 font-semibold text-red-800">
               賭け {bet}pt
             </span>

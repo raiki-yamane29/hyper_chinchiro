@@ -1,6 +1,8 @@
 export type GamePhase =
   | "lobby"
   | "ability_select"
+  | "banker_max_bet"
+  | "betting"
   | "banker_turn"
   | "player_turn"
   | "round_result"
@@ -56,6 +58,10 @@ export interface GameState {
   roundSettlements: Record<string, RoundSettlement>;
   scores: Record<string, number>;
   bets: Record<string, number>;
+  /** ランダムモードで親がそのラウンドに宣言した賭けの上限（子はこの範囲内で賭ける） */
+  maxBet: number | null;
+  /** ランダムモードで賭け確定後に決まる、賭けの低い順の子の振る順（親を除く） */
+  turnOrder: string[];
   round: number;
   maxRounds: number;
   rollCountMap: Record<string, number>;
@@ -101,6 +107,7 @@ export type ClientMessage =
   | { type: "ready" }
   | { type: "roll" }
   | { type: "use_active_ability"; payload: { pinnedValue: number } }
+  | { type: "set_max_bet"; amount: number }
   | { type: "set_bet"; amount: number }
   | { type: "next_round" }
   | { type: "return_to_lobby" }

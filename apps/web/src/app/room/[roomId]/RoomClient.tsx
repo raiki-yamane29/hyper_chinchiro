@@ -233,6 +233,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
             onReturnToLobby={() => send({ type: "return_to_lobby" })}
             onRoll={() => send({ type: "roll" })}
             onSetBet={(amount) => send({ type: "set_bet", amount })}
+            onSetMaxBet={(amount) => send({ type: "set_max_bet", amount })}
             onUseGodhand={(pinnedValue) =>
               send({ type: "use_active_ability", payload: { pinnedValue } })
             }

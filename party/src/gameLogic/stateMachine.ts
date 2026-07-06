@@ -35,6 +35,8 @@ export function createInitialState(roomId: string): GameState {
     roundSettlements: {},
     scores: {},
     bets: {},
+    maxBet: null,
+    turnOrder: [],
     round: 1,
     maxRounds: DEFAULT_MAX_ROUNDS,
     rollCountMap: {},
@@ -65,6 +67,8 @@ export function applyMessage(
       return rollForCurrentTurn(state, senderId);
     case "use_active_ability":
       return rollForCurrentTurn(state, senderId, msg.payload.pinnedValue);
+    case "set_max_bet":
+      return setMaxBet(state, senderId, msg.amount);
     case "set_bet":
       return setBet(state, senderId, msg.amount);
     case "next_round":
@@ -92,6 +96,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
   const roundSettlements = { ...state.roundSettlements };
   const debugNextRolls = { ...state.debugNextRolls };
   const bets = { ...state.bets };
+  const turnOrder = state.turnOrder.filter((id) => id !== playerId);
   delete scores[playerId];
   delete rollCountMap[playerId];
   delete playerRolls[playerId];
@@ -114,6 +119,8 @@ export function removePlayer(state: GameState, playerId: string): GameState {
       currentTurnAbilityMap: {},
       debugNextRolls,
       bets,
+      maxBet: null,
+      turnOrder: [],
     };
   }
 
@@ -126,6 +133,7 @@ export function removePlayer(state: GameState, playerId: string): GameState {
     roundSettlements,
     debugNextRolls,
     bets,
+    turnOrder,
     bankerIndex: clampIndex(state.bankerIndex, players.length),
     currentPlayerIndex: clampIndex(state.currentPlayerIndex, players.length),
   };
@@ -218,7 +226,31 @@ function joinGame(
   };
 }
 
+const MAX_BET_UPPER_BOUND = 99;
+
+// 親がそのラウンドの賭けの上限を宣言する（ランダムモードのみ）。
+// 能力が決まる前に賭けを確定させるため、親の上限宣言→子の賭け確定→能力発表の順にする
+function setMaxBet(state: GameState, senderId: string, amount: number): GameState {
+  if (state.phase !== "banker_max_bet") {
+    return state;
+  }
+  const banker = state.players[state.bankerIndex];
+  if (!banker || banker.id !== senderId) {
+    return state;
+  }
+  if (!Number.isInteger(amount) || amount < 1 || amount > MAX_BET_UPPER_BOUND) {
+    return state;
+  }
+
+  return { ...state, phase: "betting", maxBet: amount };
+}
+
 function setBet(state: GameState, senderId: string, amount: number): GameState {
+  if (state.abilityMode === "random_turn") {
+    return setBetDuringBettingPhase(state, senderId, amount);
+  }
+
+  // 選択固定モード: 従来どおり、自分の手番かつ初回ロール前のみ受け付ける
   if (state.phase !== "player_turn") {
     return state;
   }
@@ -237,6 +269,56 @@ function setBet(state: GameState, senderId: string, amount: number): GameState {
     ...state,
     bets: { ...state.bets, [senderId]: amount },
   };
+}
+
+// ランダムモード: 子は全員同時に（他の子の賭けを見ずに）賭けを決める。
+// 全員分そろったら、能力を全員分決定してから、賭けの低い順に振る順番を確定する
+function setBetDuringBettingPhase(
+  state: GameState,
+  senderId: string,
+  amount: number,
+): GameState {
+  if (state.phase !== "betting" || state.maxBet === null) {
+    return state;
+  }
+
+  const banker = state.players[state.bankerIndex];
+  const sender = state.players.find((player) => player.id === senderId);
+  if (!sender || sender.id === banker?.id) {
+    return state;
+  }
+  if (!Number.isInteger(amount) || amount < 1 || amount > state.maxBet) {
+    return state;
+  }
+
+  const bets = { ...state.bets, [senderId]: amount };
+  const children = state.players.filter((player) => player.id !== banker?.id);
+  const allBetsSubmitted = children.every(
+    (player) => bets[player.id] !== undefined,
+  );
+
+  if (!allBetsSubmitted) {
+    return { ...state, bets };
+  }
+
+  const turnOrder = [...children]
+    .sort((a, b) => bets[a.id] - bets[b.id])
+    .map((player) => player.id);
+  const currentPlayerIndex = state.players.findIndex(
+    (player) => player.id === turnOrder[0],
+  );
+
+  let revealed: GameState = {
+    ...state,
+    bets,
+    turnOrder,
+    phase: "player_turn",
+    currentPlayerIndex,
+  };
+  for (const player of state.players) {
+    revealed = ensureTurnAbility(revealed, player.id);
+  }
+  return revealed;
 }
 
 function debugSetNextRoll(
@@ -309,6 +391,8 @@ function returnToLobby(state: GameState): GameState {
     roundSettlements: {},
     scores: Object.fromEntries(state.players.map((player) => [player.id, 0])),
     bets: {},
+    maxBet: null,
+    turnOrder: [],
     round: 1,
     rollCountMap: Object.fromEntries(
       state.players.map((player) => [player.id, 0]),
@@ -444,23 +528,34 @@ function resetRound(state: GameState): GameState {
   const rollCountMap = Object.fromEntries(
     state.players.map((player) => [player.id, 0]),
   );
-  const currentPlayerIndex = nextPlayerIndex(state, state.bankerIndex);
-
-  return ensureTurnAbility({
+  const players = state.players.map((player) => ({
+    ...player,
+    abilityUsedThisRound: false,
+    isReady: true,
+  }));
+  const base: GameState = {
     ...state,
-    currentPlayerIndex,
+    players,
     bankerRoll: null,
     playerRolls: {},
     roundSettlements: {},
     rollCountMap,
     bets: {},
+    maxBet: null,
+    turnOrder: [],
     currentTurnAbilityMap: {},
-    players: state.players.map((player) => ({
-      ...player,
-      abilityUsedThisRound: false,
-      isReady: true,
-    })),
-  }, state.players[currentPlayerIndex]?.id);
+  };
+
+  if (base.abilityMode === "random_turn") {
+    // 能力が決まる前に賭けを確定させるため、まず親が賭けの上限を宣言する
+    return { ...base, phase: "banker_max_bet", currentPlayerIndex: base.bankerIndex };
+  }
+
+  const currentPlayerIndex = nextPlayerIndex(base, base.bankerIndex);
+  return ensureTurnAbility(
+    { ...base, currentPlayerIndex },
+    players[currentPlayerIndex]?.id,
+  );
 }
 
 function rollDiceForPlayer(
@@ -539,6 +634,23 @@ function getActivePlayer(state: GameState): Player | undefined {
 }
 
 function advanceToNextChildOrBanker(state: GameState): GameState {
+  // ランダムモードでは賭けの低い順に確定させた turnOrder に従って進行する
+  if (state.turnOrder.length > 0) {
+    const activeId = state.players[state.currentPlayerIndex]?.id;
+    const nextId = state.turnOrder[state.turnOrder.indexOf(activeId) + 1];
+    if (!nextId) {
+      return ensureTurnAbility(
+        { ...state, phase: "banker_turn", currentPlayerIndex: state.bankerIndex },
+        state.players[state.bankerIndex]?.id,
+      );
+    }
+    const nextIndex = state.players.findIndex((player) => player.id === nextId);
+    return ensureTurnAbility(
+      { ...state, currentPlayerIndex: nextIndex },
+      nextId,
+    );
+  }
+
   const nextIndex = nextPlayerIndex(state, state.currentPlayerIndex);
   if (nextIndex === state.bankerIndex) {
     return ensureTurnAbility(
@@ -780,6 +892,8 @@ function markRematchReady(state: GameState, senderId: string): GameState {
       roundSettlements: {},
       scores: Object.fromEntries(players.map((player) => [player.id, 0])),
       bets: {},
+      maxBet: null,
+      turnOrder: [],
       round: 1,
       rollCountMap: Object.fromEntries(players.map((player) => [player.id, 0])),
       currentTurnAbilityMap: {},
