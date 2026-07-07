@@ -28,7 +28,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
     "idle",
   );
   const { socket, status } = usePartySocket({ roomId });
-  const { state, lastRoll, error, send } = useGameState(socket);
+  const { state, error, send } = useGameState(socket);
   const isLobbyPhase = !state || state.phase === "lobby";
   const roomHasPlayers = Boolean(state?.players.length);
   const effectiveAbilityMode = roomHasPlayers
@@ -227,7 +227,6 @@ export function RoomClient({ roomId }: RoomClientProps) {
 
         <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <GameBoard
-            lastRollPlayerId={lastRoll?.playerId}
             onNextRound={() => send({ type: "next_round" })}
             onReady={() => send({ type: "ready" })}
             onReturnToLobby={() => send({ type: "return_to_lobby" })}

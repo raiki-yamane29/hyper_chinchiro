@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DiceDisplay } from "./DiceDisplay";
 import { GameResult } from "./GameResult";
 import { HandResult } from "./HandResult";
@@ -28,10 +28,12 @@ function getMaxRolls(abilityId: string | null): number {
     : DEFAULT_MAX_ROLLS;
 }
 
+// お椀アニメーションの長さ（CSS側の1.4s+余裕）。この間は役・精算の表示を隠す
+const DICE_ANIMATION_MS = 1500;
+
 interface GameBoardProps {
   state: GameState | null;
   self: Player | null;
-  lastRollPlayerId?: string;
   onReady: () => void;
   onRoll: () => void;
   onSetBet: (amount: number) => void;
@@ -44,7 +46,6 @@ interface GameBoardProps {
 export function GameBoard({
   state,
   self,
-  lastRollPlayerId,
   onReady,
   onRoll,
   onSetBet,
@@ -94,6 +95,9 @@ export function GameBoard({
   const maxBet = state?.maxBet ?? 3;
 
   const announcement = useAbilityAnnouncement(state, self, activePlayer, activeTurnAbilityId);
+  const diceAnimating = useDiceReveal(state);
+  // 演出中は役・精算・最終結果を隠す（親の最終ロールと同時に精算が届くため）
+  const anyDiceAnimating = Object.values(diceAnimating).some(Boolean);
 
   return (
     <div
@@ -128,7 +132,7 @@ export function GameBoard({
         )}
       </div>
 
-      {isGameOver && state && <GameResult state={state} />}
+      {isGameOver && state && !anyDiceAnimating && <GameResult state={state} />}
 
       {self && (
         <div className="mb-5 border-b border-stone-200 pb-5">
@@ -167,11 +171,12 @@ export function GameBoard({
 
       <div className="grid gap-4">
         <RollPanel
+          animating={banker ? (diceAnimating[banker.id] ?? false) : false}
           isActive={activePlayer?.id === banker?.id}
           isBanker
           player={banker}
+          resultsHidden={anyDiceAnimating}
           roll={state?.bankerRoll ?? null}
-          rolling={lastRollPlayerId === banker?.id}
           rollCount={banker ? (state?.rollCountMap[banker.id] ?? 0) : 0}
           settlementSummary={
             state?.phase === "round_result" || state?.phase === "game_over"
@@ -187,14 +192,15 @@ export function GameBoard({
           .filter((player) => player.id !== banker?.id)
           .map((player) => (
             <RollPanel
+              animating={diceAnimating[player.id] ?? false}
               bet={state.bets?.[player.id]}
               hideBetAmount={state.phase === "betting"}
               isActive={activePlayer?.id === player.id}
               isBanker={false}
               key={player.id}
               player={player}
+              resultsHidden={anyDiceAnimating}
               roll={state.playerRolls[player.id] ?? null}
-              rolling={lastRollPlayerId === player.id}
               rollCount={state.rollCountMap[player.id] ?? 0}
               settlement={state.roundSettlements[player.id] ?? null}
               state={state}
@@ -226,6 +232,52 @@ export function GameBoard({
       )}
     </div>
   );
+}
+
+// rollCountMap の増加で新しいロールを検知し、お椀アニメーションの間だけ
+// 該当プレイヤーを「演出中」にする。リロード直後・途中入室では演出しない
+function useDiceReveal(state: GameState | null): Record<string, boolean> {
+  const [animating, setAnimating] = useState<Record<string, boolean>>({});
+  const prevCountsRef = useRef<Record<string, number> | null>(null);
+  const timersRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+
+    const counts = state.rollCountMap;
+    const prev = prevCountsRef.current;
+    prevCountsRef.current = { ...counts };
+    if (prev === null) {
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    for (const player of state.players) {
+      if ((counts[player.id] ?? 0) > (prev[player.id] ?? 0)) {
+        const id = player.id;
+        setAnimating((current) => ({ ...current, [id]: true }));
+        window.clearTimeout(timersRef.current[id]);
+        timersRef.current[id] = window.setTimeout(() => {
+          setAnimating((current) => ({ ...current, [id]: false }));
+        }, DICE_ANIMATION_MS);
+      }
+    }
+  }, [state]);
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of Object.values(timers)) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, []);
+
+  return animating;
 }
 
 function useAbilityAnnouncement(
@@ -497,25 +549,27 @@ function BetNumberInput({
 }
 
 function RollPanel({
+  animating,
   bet,
   hideBetAmount,
   isActive,
   isBanker,
   player,
+  resultsHidden,
   roll,
-  rolling,
   rollCount,
   settlement,
   settlementSummary,
   state,
 }: {
+  animating: boolean;
   bet?: number;
   hideBetAmount?: boolean;
   isActive: boolean;
   isBanker: boolean;
   player: Player | null;
+  resultsHidden: boolean;
   roll: RollResult | null;
-  rolling: boolean;
   rollCount: number;
   settlement?: RoundSettlement | null;
   settlementSummary?: { label: string; delta: number } | null;
@@ -560,13 +614,21 @@ function RollPanel({
       </div>
       <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>
-          <DiceDisplay dice={roll?.dice ?? null} rolling={rolling} />
-          <HandResult remaining={remaining} roll={roll} />
+          <DiceDisplay
+            animating={animating}
+            animationKey={`${player?.id ?? "empty"}-${rollCount}`}
+            dice={roll?.dice ?? null}
+          />
+          {animating ? (
+            <p className="mt-2 text-sm text-stone-400">出目を確認中…</p>
+          ) : (
+            <HandResult remaining={remaining} roll={roll} />
+          )}
         </div>
         <SettlementDisplay
           playerId={player?.id ?? null}
-          settlement={settlement}
-          summary={settlementSummary}
+          settlement={resultsHidden ? null : settlement}
+          summary={resultsHidden ? null : settlementSummary}
         />
       </div>
     </section>

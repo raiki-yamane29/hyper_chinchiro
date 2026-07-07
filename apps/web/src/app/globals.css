@@ -25,24 +25,60 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-@keyframes dice-tumble {
+/* お椀への投入: 落下 → 着椀バウンド → 内周を減速しながら転がる → 定位置 */
+@keyframes bowl-throw {
   0% {
-    transform: translateY(0) rotate(0deg) scale(1);
+    transform: translate(calc(46px * var(--sway, 1)), -120px) scale(1.2);
+    opacity: 0;
   }
-  20% {
-    transform: translateY(-10px) rotate(-25deg) scale(1.05);
+  8% {
+    opacity: 1;
+  }
+  22% {
+    transform: translate(calc(30px * var(--sway, 1)), 5px) scale(1);
   }
   40% {
-    transform: translateY(2px) rotate(20deg) scale(0.95);
+    transform: translate(calc(-26px * var(--sway, 1)), -10px) scale(1);
   }
-  60% {
-    transform: translateY(-6px) rotate(-15deg) scale(1.05);
+  58% {
+    transform: translate(calc(18px * var(--sway, 1)), 6px) scale(1);
   }
-  80% {
-    transform: translateY(1px) rotate(8deg) scale(1);
+  76% {
+    transform: translate(calc(-8px * var(--sway, 1)), -3px) scale(1);
+  }
+  90% {
+    transform: translate(calc(2px * var(--sway, 1)), 1px) scale(1);
   }
   100% {
-    transform: translateY(0) rotate(0deg) scale(1);
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* サイコロの自転: 乱回転しつつ、余分な全回転を足した最終姿勢（=サーバー確定の出目）に収束 */
+@keyframes bowl-spin {
+  0% {
+    transform: rotateZ(0deg) rotateX(0deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateZ(calc(360deg * var(--spin-dir, 1)))
+      rotateX(calc(720deg + var(--final-rx, 0deg)))
+      rotateY(calc(360deg * var(--spin-dir, 1) + var(--final-ry, 0deg)));
+  }
+}
+
+.bowl-thrower {
+  animation: bowl-throw 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.bowl-cube-spin {
+  animation: bowl-spin 1.4s cubic-bezier(0.25, 0.6, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bowl-thrower,
+  .bowl-cube-spin {
+    animation: none;
   }
 }
 
