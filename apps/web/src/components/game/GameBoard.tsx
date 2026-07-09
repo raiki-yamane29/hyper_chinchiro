@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DiceDisplay } from "./DiceDisplay";
+import { FlatDice, SharedBowl } from "./DiceDisplay";
 import { GameResult } from "./GameResult";
 import { HandResult } from "./HandResult";
 import {
@@ -34,6 +34,7 @@ const DICE_ANIMATION_MS = 1500;
 interface GameBoardProps {
   state: GameState | null;
   self: Player | null;
+  lastRoll?: { playerId: string; result: RollResult } | null;
   onReady: () => void;
   onRoll: () => void;
   onSetBet: (amount: number) => void;
@@ -46,6 +47,7 @@ interface GameBoardProps {
 export function GameBoard({
   state,
   self,
+  lastRoll,
   onReady,
   onRoll,
   onSetBet,
@@ -98,6 +100,26 @@ export function GameBoard({
   const diceAnimating = useDiceReveal(state);
   // 演出中は役・精算・最終結果を隠す（親の最終ロールと同時に精算が届くため）
   const anyDiceAnimating = Object.values(diceAnimating).some(Boolean);
+  const selfRemaining = self
+    ? getMaxRolls(activeAbilityId) - (state?.rollCountMap[self.id] ?? 0)
+    : 0;
+
+  // 共有お椀に表示する対象: 演出中のプレイヤーがいればそれを、
+  // いなければ直近のロール（ラウンドが変わって古くなっていない場合のみ）を表示する
+  const animatingPlayerId =
+    state?.players.find((player) => diceAnimating[player.id])?.id ?? null;
+  const lastRollFresh =
+    lastRoll && (state?.rollCountMap[lastRoll.playerId] ?? 0) > 0
+      ? lastRoll.playerId
+      : null;
+  const bowlPlayerId = animatingPlayerId ?? lastRollFresh;
+  const bowlPlayer = state?.players.find((p) => p.id === bowlPlayerId) ?? null;
+  const bowlDice = bowlPlayer
+    ? bowlPlayer.id === banker?.id
+      ? state?.bankerRoll?.dice ?? null
+      : state?.playerRolls[bowlPlayer.id]?.dice ?? null
+    : null;
+  const bowlAnimating = bowlPlayerId ? (diceAnimating[bowlPlayerId] ?? false) : false;
 
   return (
     <div
@@ -142,6 +164,16 @@ export function GameBoard({
           />
         </div>
       )}
+
+      <SharedBowl
+        animating={bowlAnimating}
+        animationKey={`${bowlPlayerId ?? "empty"}-${bowlPlayerId ? state?.rollCountMap[bowlPlayerId] ?? 0 : 0}`}
+        canRoll={canRoll && !bowlAnimating}
+        dice={bowlDice}
+        onRoll={onRoll}
+        playerName={bowlPlayer?.nickname ?? null}
+        remaining={selfRemaining}
+      />
 
       {canUseGodhand && (
         <div className="mb-5 grid gap-3 border border-red-200 bg-red-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -575,9 +607,7 @@ function RollPanel({
   settlementSummary?: { label: string; delta: number } | null;
   state: GameState | null;
 }) {
-  const title = player
-    ? `${player.nickname}${isBanker ? "(親)" : ""} の出目`
-    : "出目";
+  const name = player ? `${player.nickname}${isBanker ? "(親)" : ""}` : "-";
   const abilityId = player ? getEffectiveAbilityId(state, player) : null;
   const maxRolls = getMaxRolls(abilityId);
   const remaining = maxRolls - rollCount;
@@ -585,52 +615,52 @@ function RollPanel({
   return (
     <section
       className={[
-        "border p-4",
+        "flex flex-wrap items-center gap-3 border px-3 py-2",
         isActive ? "border-red-800 bg-red-50" : "border-stone-200",
       ].join(" ")}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-stone-700">
-          {title}
+      <div className="flex min-w-24 flex-col gap-0.5">
+        <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-stone-700">
+          {name}
           {player?.connected === false && (
-            <span className="ml-2 border border-amber-500 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            <span className="border border-amber-500 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
               切断中
             </span>
           )}
-        </h2>
-        <div className="flex items-center gap-2 text-xs text-stone-500">
-          {!isBanker && hideBetAmount && bet !== undefined && (
-            <span className="border border-stone-300 bg-stone-50 px-2 py-0.5 font-semibold text-stone-600">
-              賭け確定済み
-            </span>
-          )}
-          {!isBanker && !hideBetAmount && bet && bet > 1 && (
-            <span className="border border-red-300 bg-red-50 px-2 py-0.5 font-semibold text-red-800">
-              賭け {bet}pt
-            </span>
-          )}
-          {abilityId && <span>ability {abilityNames[abilityId] ?? abilityId}</span>}
-        </div>
+        </span>
+        {abilityId && (
+          <span className="text-xs text-stone-500">
+            {abilityNames[abilityId] ?? abilityId}
+          </span>
+        )}
       </div>
-      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <div>
-          <DiceDisplay
-            animating={animating}
-            animationKey={`${player?.id ?? "empty"}-${rollCount}`}
-            dice={roll?.dice ?? null}
-          />
-          {animating ? (
-            <p className="mt-2 text-sm text-stone-400">出目を確認中…</p>
-          ) : (
-            <HandResult remaining={remaining} roll={roll} />
-          )}
-        </div>
-        <SettlementDisplay
-          playerId={player?.id ?? null}
-          settlement={resultsHidden ? null : settlement}
-          summary={resultsHidden ? null : settlementSummary}
-        />
+
+      <FlatDice dice={roll?.dice ?? null} hidden={animating} />
+
+      <div className="min-w-0 flex-1 text-sm">
+        {animating ? (
+          <span className="text-stone-400">出目を確認中…</span>
+        ) : (
+          <HandResult compact remaining={remaining} roll={roll} />
+        )}
       </div>
+
+      {!isBanker && hideBetAmount && bet !== undefined && (
+        <span className="border border-stone-300 bg-stone-50 px-2 py-0.5 text-xs font-semibold text-stone-600">
+          賭け確定済み
+        </span>
+      )}
+      {!isBanker && !hideBetAmount && bet && bet > 1 && (
+        <span className="border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
+          賭け {bet}pt
+        </span>
+      )}
+
+      <SettlementDisplay
+        playerId={player?.id ?? null}
+        settlement={resultsHidden ? null : settlement}
+        summary={resultsHidden ? null : settlementSummary}
+      />
     </section>
   );
 }
@@ -687,7 +717,7 @@ function PointDeltaCard({
   return (
     <div
       className={[
-        "grid min-w-32 gap-1 border p-3 text-right text-sm",
+        "grid shrink-0 gap-0.5 border px-2 py-1 text-right text-xs",
         positive
           ? "border-emerald-300 bg-emerald-50 text-emerald-800"
           : neutral
@@ -695,12 +725,12 @@ function PointDeltaCard({
             : "border-red-300 bg-red-50 text-red-800",
       ].join(" ")}
     >
-      <span className="text-xs font-semibold">{label}</span>
-      <span className="text-2xl font-bold">
+      <span className="text-[10px] font-semibold">{label}</span>
+      <span className="text-lg font-bold">
         {delta > 0 ? "+" : ""}
         {delta}pt
       </span>
-      {reason && <span className="text-xs">{reason}</span>}
+      {reason && <span className="text-[10px]">{reason}</span>}
     </div>
   );
 }

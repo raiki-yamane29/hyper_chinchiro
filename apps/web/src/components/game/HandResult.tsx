@@ -13,15 +13,26 @@ const handLabels: Record<RollResult["hand"], string> = {
 interface HandResultProps {
   roll: RollResult | null;
   remaining?: number;
+  /** 行内表示など、上マージンを詰めたいとき */
+  compact?: boolean;
 }
 
-export function HandResult({ roll, remaining }: HandResultProps) {
+export function HandResult({ roll, remaining, compact }: HandResultProps) {
   if (!roll) {
-    return <p className="mt-2 text-sm text-stone-500">未ロール</p>;
+    return (
+      <p className={[compact ? "" : "mt-2", "text-sm text-stone-500"].join(" ")}>
+        未ロール
+      </p>
+    );
   }
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+    <div
+      className={[
+        compact ? "" : "mt-2",
+        "flex flex-wrap items-center gap-2 text-sm",
+      ].join(" ")}
+    >
       <span className="font-semibold">{formatHand(roll)}</span>
       {!roll.isValid && (
         <span className="border border-amber-500 px-2 py-0.5 text-amber-700">

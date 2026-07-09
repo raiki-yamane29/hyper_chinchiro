@@ -2,17 +2,6 @@
 
 import type { CSSProperties } from "react";
 
-interface DiceDisplayProps {
-  dice: [number, number, number] | null;
-  /** 演出中はサイコロが投入〜回転する。falseなら確定姿勢で静止表示 */
-  animating?: boolean;
-  /** 振り直しごとに変わる値を渡すとCSSアニメーションが再発火する */
-  animationKey?: string;
-}
-
-const DIE_SIZE = 40;
-const HALF = DIE_SIZE / 2;
-
 // 3x3グリッド（0〜8、左上から右下）のどのセルにドットを置くか
 const PIP_LAYOUT: Record<number, number[]> = {
   1: [4],
@@ -22,16 +11,6 @@ const PIP_LAYOUT: Record<number, number[]> = {
   5: [0, 2, 4, 6, 8],
   6: [0, 2, 3, 5, 6, 8],
 };
-
-// キューブの6面配置（対面の和が7になる実物のサイコロ配置）
-const CUBE_FACES: Array<{ value: number; transform: string }> = [
-  { value: 1, transform: `translateZ(${HALF}px)` },
-  { value: 6, transform: `rotateY(180deg) translateZ(${HALF}px)` },
-  { value: 3, transform: `rotateY(90deg) translateZ(${HALF}px)` },
-  { value: 4, transform: `rotateY(-90deg) translateZ(${HALF}px)` },
-  { value: 5, transform: `rotateX(90deg) translateZ(${HALF}px)` },
-  { value: 2, transform: `rotateX(-90deg) translateZ(${HALF}px)` },
-];
 
 // 出目を正面（上面として見せる側）に向けるためのキューブ回転
 const FACE_ROTATION: Record<number, { rx: number; ry: number }> = {
@@ -53,50 +32,155 @@ const RESTING = [
   { y: 5, tilt: -2 },
 ];
 
-export function DiceDisplay({
-  dice,
-  animating = false,
-  animationKey,
-}: DiceDisplayProps) {
-  const values: Array<number | null> = dice ?? [null, null, null];
+function cubeFaces(half: number): Array<{ value: number; transform: string }> {
+  return [
+    { value: 1, transform: `translateZ(${half}px)` },
+    { value: 6, transform: `rotateY(180deg) translateZ(${half}px)` },
+    { value: 3, transform: `rotateY(90deg) translateZ(${half}px)` },
+    { value: 4, transform: `rotateY(-90deg) translateZ(${half}px)` },
+    { value: 5, transform: `rotateX(90deg) translateZ(${half}px)` },
+    { value: 2, transform: `rotateX(-90deg) translateZ(${half}px)` },
+  ];
+}
+
+// ---------- FlatDice: プレイヤー行のコンパクトな出目表示（お椀なし） ----------
+
+interface FlatDiceProps {
+  dice: [number, number, number] | null;
+  /** 演出中（お椀で回転中）は自分の行では出目を隠す */
+  hidden?: boolean;
+}
+
+export function FlatDice({ dice, hidden = false }: FlatDiceProps) {
+  const values: Array<number | null> = hidden ? [null, null, null] : dice ?? [null, null, null];
 
   return (
-    <div className="relative h-28 w-52">
-      {/* お椀 外側（漆塗り） */}
-      <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-stone-900 via-red-950 to-red-900 shadow-[0_6px_14px_rgba(0,0,0,0.3)]" />
-      {/* お椀 内側（木地） */}
-      <div
-        className="absolute inset-[7px] rounded-[50%] shadow-[inset_0_8px_18px_rgba(0,0,0,0.4),inset_0_-2px_6px_rgba(255,255,255,0.25)]"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 35%, #f7ecd2 0%, #ecd9ab 55%, #c9a86a 100%)",
-        }}
-      />
-      {/* サイコロ層（keyの変更でアニメーションを確実に再発火させる） */}
-      <div
-        className="absolute inset-0 flex items-center justify-center gap-3"
-        key={animationKey}
-      >
-        {values.map((value, index) =>
-          value === null ? (
-            <UnrolledDie key={index} />
+    <div className="flex gap-1.5">
+      {values.map((value, index) => (
+        <div
+          className="grid size-8 place-items-center rounded-sm border border-stone-400 bg-[#fffaf0] p-1"
+          key={index}
+        >
+          {value === null ? (
+            <span className="text-sm font-bold text-stone-300">?</span>
           ) : (
-            <Die3D
-              animating={animating}
-              index={index}
-              key={index}
-              value={value}
-            />
-          ),
-        )}
-      </div>
+            <div className="grid size-full grid-cols-3 grid-rows-3">
+              {Array.from({ length: 9 }, (_, cell) => (
+                <span className="grid place-items-center" key={cell}>
+                  {(PIP_LAYOUT[value] ?? []).includes(cell) && (
+                    <span
+                      className={[
+                        "size-1 rounded-full",
+                        value === 1 ? "bg-red-600" : "bg-stone-900",
+                      ].join(" ")}
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
-function UnrolledDie() {
+// ---------- SharedBowl: 卓の中央に1つだけ置く大きなお椀 ----------
+
+interface SharedBowlProps {
+  dice: [number, number, number] | null;
+  playerName: string | null;
+  animating: boolean;
+  animationKey: string;
+  canRoll: boolean;
+  remaining: number;
+  onRoll: () => void;
+}
+
+const BOWL_DIE_SIZE = 52;
+
+export function SharedBowl({
+  dice,
+  playerName,
+  animating,
+  animationKey,
+  canRoll,
+  remaining,
+  onRoll,
+}: SharedBowlProps) {
+  const values: Array<number | null> = dice ?? [null, null, null];
+  const label = playerName
+    ? animating
+      ? `${playerName} が振っています…`
+      : `${playerName} の出目`
+    : "まだ誰も振っていません";
+
   return (
-    <div className="grid size-10 place-items-center rounded-sm border border-stone-400/60 bg-[#fffaf0]/70 text-lg font-bold text-stone-300 shadow-sm">
+    <div className="mb-5 flex flex-col items-center gap-3">
+      <button
+        aria-label={
+          canRoll ? `お椀をタップして振る（あと${remaining}回）` : label
+        }
+        className={[
+          "relative size-56 shrink-0 rounded-full sm:size-72",
+          canRoll ? "cursor-pointer" : "cursor-default",
+        ].join(" ")}
+        data-testid="shared-bowl"
+        disabled={!canRoll}
+        onClick={canRoll ? onRoll : undefined}
+        type="button"
+      >
+        {/* お椀 外側（漆塗り） */}
+        <div
+          className={[
+            "absolute inset-0 rounded-full bg-gradient-to-b from-stone-900 via-red-950 to-red-900 shadow-[0_10px_24px_rgba(0,0,0,0.35)] transition",
+            canRoll ? "hover:brightness-110" : "",
+          ].join(" ")}
+        />
+        {/* お椀 内側（木地） */}
+        <div
+          className="absolute inset-[10px] rounded-full shadow-[inset_0_10px_26px_rgba(0,0,0,0.4),inset_0_-3px_8px_rgba(255,255,255,0.25)]"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 35%, #f7ecd2 0%, #ecd9ab 55%, #c9a86a 100%)",
+          }}
+        />
+        {/* サイコロ層（keyの変更でアニメーションを確実に再発火させる） */}
+        <div
+          className="absolute inset-0 flex items-center justify-center gap-4"
+          key={animationKey}
+        >
+          {values.map((value, index) =>
+            value === null ? (
+              <UnrolledDie key={index} size={BOWL_DIE_SIZE} />
+            ) : (
+              <Die3D
+                animating={animating}
+                index={index}
+                key={index}
+                size={BOWL_DIE_SIZE}
+                value={value}
+              />
+            ),
+          )}
+        </div>
+        {canRoll && (
+          <span className="absolute inset-x-0 bottom-7 animate-pulse text-center text-sm font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">
+            タップして振る！（あと{remaining}回）
+          </span>
+        )}
+      </button>
+      <p className="text-sm text-stone-600">{label}</p>
+    </div>
+  );
+}
+
+function UnrolledDie({ size }: { size: number }) {
+  return (
+    <div
+      className="grid place-items-center rounded-sm border border-stone-400/60 bg-[#fffaf0]/70 font-bold text-stone-300 shadow-sm"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
       ?
     </div>
   );
@@ -106,10 +190,12 @@ function Die3D({
   value,
   index,
   animating,
+  size,
 }: {
   value: number;
   index: number;
   animating: boolean;
+  size: number;
 }) {
   const { rx, ry } = FACE_ROTATION[value] ?? FACE_ROTATION[1];
   const rest = RESTING[index] ?? RESTING[0];
@@ -120,7 +206,7 @@ function Die3D({
     <div
       style={{
         transform: `translateY(${rest.y}px) rotate(${rest.tilt}deg)`,
-        perspective: "560px",
+        perspective: size * 14,
       }}
     >
       {/* thrower: 投入〜周回〜静止の位置アニメーション */}
@@ -131,6 +217,7 @@ function Die3D({
             transformStyle: "preserve-3d",
             animationDelay: delay,
             "--sway": SWAYS[index] ?? 1,
+            "--amp": 1.4,
           } as CSSProperties
         }
       >
@@ -139,8 +226,8 @@ function Die3D({
           className={animating ? "bowl-cube-spin" : undefined}
           style={
             {
-              width: DIE_SIZE,
-              height: DIE_SIZE,
+              width: size,
+              height: size,
               transformStyle: "preserve-3d",
               transform: `rotateX(${rx}deg) rotateY(${ry}deg)`,
               animationDelay: delay,
@@ -150,9 +237,10 @@ function Die3D({
             } as CSSProperties
           }
         >
-          {CUBE_FACES.map((face) => (
+          {cubeFaces(size / 2).map((face) => (
             <DieFace
               key={face.value}
+              size={size}
               transform={face.transform}
               value={face.value}
             />
@@ -163,22 +251,32 @@ function Die3D({
   );
 }
 
-function DieFace({ value, transform }: { value: number; transform: string }) {
+function DieFace({
+  value,
+  transform,
+  size,
+}: {
+  value: number;
+  transform: string;
+  size: number;
+}) {
   const pips = PIP_LAYOUT[value] ?? [];
+  const pipSize = Math.max(4, Math.round(size / 8));
 
   return (
     <div
-      className="absolute inset-0 grid grid-cols-3 grid-rows-3 rounded-sm border border-stone-400 bg-[#fffaf0] p-[5px]"
-      style={{ transform, backfaceVisibility: "hidden" }}
+      className="absolute inset-0 grid grid-cols-3 grid-rows-3 rounded-sm border border-stone-400 bg-[#fffaf0]"
+      style={{ transform, backfaceVisibility: "hidden", padding: size / 8 }}
     >
       {Array.from({ length: 9 }, (_, cell) => (
         <span className="grid place-items-center" key={cell}>
           {pips.includes(cell) && (
             <span
               className={[
-                "size-1.5 rounded-full",
+                "rounded-full",
                 value === 1 ? "bg-red-600" : "bg-stone-900",
               ].join(" ")}
+              style={{ width: pipSize, height: pipSize }}
             />
           )}
         </span>
