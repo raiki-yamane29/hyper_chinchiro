@@ -165,8 +165,10 @@ export function SharedBowl({
           )}
         </div>
         {canRoll && (
-          <span className="absolute inset-x-0 bottom-7 animate-pulse text-center text-sm font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">
-            タップして振る！（あと{remaining}回）
+          <span className="absolute inset-x-0 bottom-5 flex justify-center">
+            <span className="animate-pulse rounded-full bg-stone-950/80 px-3 py-1 text-center text-sm font-bold text-white shadow-sm">
+              タップして振る！（あと{remaining}回）
+            </span>
           </span>
         )}
       </button>
