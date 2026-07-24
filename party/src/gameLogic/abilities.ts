@@ -92,15 +92,6 @@ export const ABILITIES: Ability[] = [
     },
   },
   {
-    id: "chaos",
-    name: "カオスダイス",
-    description: "毎回ランダムなウェイトを生成する",
-    isActive: false,
-    rarityWeight: 10,
-    applyWeights: () =>
-      Array.from({ length: 6 }, () => 0.5 + Math.random() * 3) as DiceWeights,
-  },
-  {
     id: "shigoro",
     name: "シゴロ賽",
     description: "4・5・6の目しか出なくする",

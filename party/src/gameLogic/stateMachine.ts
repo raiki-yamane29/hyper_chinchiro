@@ -167,12 +167,15 @@ function joinGame(
   const cleanNickname = nickname.trim().slice(0, 24) || "名無し";
   const ability = getAbility(abilityId);
   const existing = state.players.find((player) => player.id === senderId);
+  // ロビー中はもちろん、能力選択中（ゲーム開始前・再戦直後）も設定変更を許可する
+  const canChangeSettings =
+    state.phase === "lobby" || state.phase === "ability_select";
   const nextAbilityMode =
-    state.phase === "lobby" && isAbilityMode(abilityMode)
+    canChangeSettings && isAbilityMode(abilityMode)
       ? abilityMode
       : state.abilityMode;
   const nextRoundsPerPlayer =
-    state.phase === "lobby" && isValidRoundsPerPlayer(roundsPerPlayer)
+    canChangeSettings && isValidRoundsPerPlayer(roundsPerPlayer)
       ? roundsPerPlayer
       : state.roundsPerPlayer;
 

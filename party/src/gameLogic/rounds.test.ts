@@ -35,11 +35,23 @@ describe("roundsPerPlayer によるラウンド数の連動", () => {
     expect(state.maxRounds).toBe(4);
   });
 
-  it("lobby以外でのroundsPerPlayer指定は無視される", () => {
+  it("ability_selectフェーズ中でもroundsPerPlayer指定は反映される（再戦後の設定変更を許可するため）", () => {
     let state = createInitialState("r3");
     state = join(state, "A", 1);
     state = join(state, "B");
-    // 既にability_selectフェーズに入っているので反映されない
+    expect(state.phase).toBe("ability_select");
+    state = join(state, "A", 3);
+    expect(state.roundsPerPlayer).toBe(3);
+  });
+
+  it("ゲーム開始後（banker_turn等）のroundsPerPlayer指定は無視される", () => {
+    let state = createInitialState("r4");
+    state = join(state, "A", 1);
+    state = join(state, "B");
+    state = applyMessage(state, { type: "ready" }, "A");
+    state = applyMessage(state, { type: "ready" }, "B");
+    expect(state.phase).not.toBe("lobby");
+    expect(state.phase).not.toBe("ability_select");
     state = join(state, "A", 3);
     expect(state.roundsPerPlayer).toBe(1);
   });

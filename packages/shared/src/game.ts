@@ -88,7 +88,6 @@ export const ABILITY_INFO: AbilityInfo[] = [
   { id: "lucky_five", name: "ラッキーファイブ", description: "5の出目が出やすくなります。" },
   { id: "lucky_six", name: "ラッキーシックス", description: "6の出目が出やすくなります。" },
   { id: "no_one", name: "ピンゾロ封じ", description: "1の出目を抑えて、ピンゾロやヒフミに寄りにくくします。" },
-  { id: "chaos", name: "カオスダイス", description: "手番ごとにサイコロの重みがランダムに変わります。" },
   { id: "shigoro", name: "シゴロ賽", description: "4・5・6の目しか出なくなります。" },
   { id: "hifumi123", name: "ヒフミ賽", description: "1・2・3の目しか出なくなります。" },
   { id: "gambler", name: "ギャンブラー", description: "自分が絡む精算のポイントの受け渡しが倍になります。" },

@@ -85,6 +85,19 @@ export default function Home() {
     goToRoom(roomId);
   };
 
+  const joinRoom = (room: RoomListEntry) => {
+    if (room.hasPassword) {
+      const input = window.prompt(
+        "このルームにはパスワードが設定されています。パスワードを入力してください。",
+      );
+      if (!input) {
+        return;
+      }
+      sessionStorage.setItem(passwordStorageKey(room.roomId), input);
+    }
+    goToRoom(room.roomId);
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f2e8] text-stone-950">
       <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6">
@@ -179,7 +192,7 @@ export default function Home() {
                 <button
                   className="h-10 border border-stone-800 px-4 text-sm font-semibold disabled:border-stone-300 disabled:text-stone-400"
                   disabled={!nickname.trim()}
-                  onClick={() => goToRoom(room.roomId)}
+                  onClick={() => joinRoom(room)}
                   type="button"
                 >
                   参加
