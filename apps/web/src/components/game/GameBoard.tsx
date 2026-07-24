@@ -466,7 +466,7 @@ function ActionBar({
               onClick={onReturnToLobby}
               type="button"
             >
-              能力モードに戻る
+              設定を変更する
             </button>
           )}
           {action && (

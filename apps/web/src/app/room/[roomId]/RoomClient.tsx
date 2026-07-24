@@ -25,10 +25,6 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const { state, lastRoll, error, send } = useGameState(socket);
   const isLobbyPhase = !state || state.phase === "lobby";
   const isSettingsPhase = isLobbyPhase || state?.phase === "ability_select";
-  const roomHasPlayers = Boolean(state?.players.length);
-  const effectiveRoundsPerPlayer = roomHasPlayers
-    ? (state?.roundsPerPlayer ?? 1)
-    : selectedRoundsPerPlayer;
 
   useEffect(() => {
     const stored = sessionStorage.getItem(`room-password-${roomId}`);
@@ -36,6 +32,15 @@ export function RoomClient({ roomId }: RoomClientProps) {
       setPassword(stored);
     }
   }, [roomId]);
+
+  // サーバー側のroundsPerPlayerが変わったとき（他プレイヤーの変更確定など）だけ
+  // ローカルの選択値に反映する。他の理由でのstate_update（isReady変化等）では
+  // 発火しないため、編集中の選択がブロードキャストで勝手に戻ることはない
+  useEffect(() => {
+    if (state?.roundsPerPlayer !== undefined) {
+      setSelectedRoundsPerPlayer(state.roundsPerPlayer);
+    }
+  }, [state?.roundsPerPlayer]);
 
   // 誤ったパスワード（または直接URLで来た未知のパスワード付きルーム）で参加が
   // 拒否されたら、再入力を促す
@@ -81,7 +86,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
                 nickname,
                 abilityId: "trickster",
                 abilityMode: "random_turn",
-                roundsPerPlayer: effectiveRoundsPerPlayer,
+                roundsPerPlayer: selectedRoundsPerPlayer,
                 password,
               });
             }}
@@ -124,7 +129,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
                 onChange={(event) =>
                   setSelectedRoundsPerPlayer(Number(event.target.value))
                 }
-                value={effectiveRoundsPerPlayer}
+                value={selectedRoundsPerPlayer}
               >
                 <option value={1}>人数×1（全員が親を1回）</option>
                 <option value={2}>人数×2</option>

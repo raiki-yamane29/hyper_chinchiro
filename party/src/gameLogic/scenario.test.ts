@@ -153,13 +153,62 @@ describe("結合テスト: 再戦シナリオ", () => {
     expect(state.history.length).toBe(2);
     expect(Object.values(state.scores).some((score) => score !== 0)).toBe(true);
 
+    // 再戦Readyを1回押すだけで、もう一度Readyを待たずそのまま次のゲームが始まる
     state = applyMessage(state, { type: "ready" }, "A");
     state = applyMessage(state, { type: "ready" }, "B");
 
-    expect(state.phase).toBe("ability_select");
+    expect(state.phase).toBe("player_turn");
+    expect(state.maxRounds).toBe(2);
     expect(Object.values(state.scores).every((score) => score === 0)).toBe(true);
     expect(state.history).toEqual([]);
     expect(state.bets).toEqual({});
+  });
+
+  it("random_turnモードの再戦はReady1回でbanker_max_betへ直行する", () => {
+    let state = createInitialState("scenario-rematch-random");
+    state = applyMessage(
+      state,
+      {
+        type: "join",
+        nickname: "A",
+        abilityId: "trickster",
+        abilityMode: "random_turn",
+        roundsPerPlayer: 1,
+      },
+      "A",
+    );
+    state = applyMessage(
+      state,
+      { type: "join", nickname: "B", abilityId: "trickster" },
+      "B",
+    );
+    state = applyMessage(state, { type: "ready" }, "A");
+    state = applyMessage(state, { type: "ready" }, "B");
+
+    // random_turnは親の賭け上限宣言(banker_max_bet)から。maxRounds=2（2人×1）を最後まで進める
+    for (let round = 1; round <= 2; round++) {
+      const banker = state.players[state.bankerIndex];
+      state = applyMessage(state, { type: "set_max_bet", amount: 1 }, banker.id);
+      const child = state.players.find((p) => p.id !== banker.id)!;
+      state = applyMessage(state, { type: "set_bet", amount: 1 }, child.id);
+      while (state.phase !== "banker_turn") {
+        const activeId = state.players[state.currentPlayerIndex].id;
+        state = forceRoll(state, activeId, [3, 3, 4]);
+      }
+      state = forceRoll(state, banker.id, [1, 1, 5]);
+
+      if (round < 2) {
+        state = applyMessage(state, { type: "next_round" }, banker.id);
+      }
+    }
+
+    expect(state.phase).toBe("game_over");
+
+    state = applyMessage(state, { type: "ready" }, "A");
+    state = applyMessage(state, { type: "ready" }, "B");
+
+    expect(state.phase).toBe("banker_max_bet");
+    expect(state.maxRounds).toBe(2);
   });
 });
 

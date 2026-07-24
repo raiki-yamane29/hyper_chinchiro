@@ -862,14 +862,12 @@ function markRematchReady(state: GameState, senderId: string): GameState {
   );
 
   if (players.length >= 2 && players.every((player) => player.isReady)) {
-    return {
+    // 通常のability_select→player_turn遷移(markReady)と同じ着地点へ直接進める。
+    // 再戦は「もう一度全員Ready」を要求せず、Ready1回でそのまま次のゲームを開始する
+    return resetRound({
       ...state,
-      phase: "ability_select",
-      players: players.map((player) => ({
-        ...player,
-        abilityUsedThisRound: false,
-        isReady: false,
-      })),
+      phase: "player_turn",
+      players,
       bankerIndex: 0,
       currentPlayerIndex: 0,
       bankerRoll: null,
@@ -883,7 +881,8 @@ function markRematchReady(state: GameState, senderId: string): GameState {
       rollCountMap: Object.fromEntries(players.map((player) => [player.id, 0])),
       currentTurnAbilityMap: {},
       history: [],
-    };
+      maxRounds: players.length * state.roundsPerPlayer,
+    });
   }
 
   return { ...state, players };

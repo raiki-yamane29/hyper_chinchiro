@@ -190,8 +190,7 @@ export default function Home() {
                   </span>
                 </div>
                 <button
-                  className="h-10 border border-stone-800 px-4 text-sm font-semibold disabled:border-stone-300 disabled:text-stone-400"
-                  disabled={!nickname.trim()}
+                  className="h-10 border border-stone-800 px-4 text-sm font-semibold"
                   onClick={() => joinRoom(room)}
                   type="button"
                 >
