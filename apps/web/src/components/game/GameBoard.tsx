@@ -178,7 +178,7 @@ export function GameBoard({
       {canUseGodhand && (
         <div className="mb-5 grid gap-3 border border-red-200 bg-red-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <label className="grid gap-2 text-sm font-semibold">
-            神の一手
+            神の一手（サイコロ2個をこの目に固定）
             <select
               className="h-10 border border-red-200 bg-white px-3 text-base outline-none focus:border-red-700"
               onChange={(event) => setPinnedValue(Number(event.target.value))}

@@ -13,7 +13,6 @@ export interface Ability {
 export interface AbilityContext {
   rollCount: number;
   abilityUsedThisRound: boolean;
-  pinnedDiceValue?: number;
 }
 
 export const BASE_WEIGHTS: DiceWeights = [1, 1, 1, 1, 1, 1];
@@ -118,18 +117,12 @@ export const ABILITIES: Ability[] = [
   {
     id: "godhand",
     name: "神の一手",
-    description: "1ラウンド1回、サイコロ1個を任意の目に固定する",
+    description: "1ラウンド1回、サイコロ2個を選択した同じ目に固定する",
     isActive: true,
     rarityWeight: 1,
-    applyWeights: (base, ctx) => {
-      if (!ctx.pinnedDiceValue || ctx.abilityUsedThisRound) {
-        return cloneWeights(base);
-      }
-
-      const weights: DiceWeights = [0, 0, 0, 0, 0, 0];
-      weights[ctx.pinnedDiceValue - 1] = 1;
-      return weights;
-    },
+    // ダイスの固定はstateMachine.tsのrollDiceForPlayerで特別扱いするため、
+    // 通常のウェイト計算では何もしない
+    applyWeights: (base) => cloneWeights(base),
   },
   {
     id: "double_chance",

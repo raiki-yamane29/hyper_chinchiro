@@ -570,15 +570,11 @@ function rollDiceForPlayer(
   pinnedValue?: number,
 ): RollResult {
   if (abilityId === "godhand" && pinnedValue !== undefined) {
-    const remainingWeights = applyAbilityWeights(abilityId, BASE_WEIGHTS, {
-      rollCount,
-      abilityUsedThisRound: player.abilityUsedThisRound,
-      pinnedDiceValue: pinnedValue,
-    });
+    // サイコロ2個を選択した同じ目に固定し、残り1個だけ通常通り振る
     const dice: [number, number, number] = [
       pinnedValue,
-      rollWithPlayerWeights(player, abilityId, rollCount, remainingWeights),
-      rollWithPlayerWeights(player, abilityId, rollCount, remainingWeights),
+      pinnedValue,
+      rollWithWeights(BASE_WEIGHTS),
     ];
     return evaluateHand(shuffleDice(dice));
   }
@@ -593,22 +589,6 @@ function rollDiceForPlayer(
     rollWithWeights(weights),
     rollWithWeights(weights),
   ]);
-}
-
-function rollWithPlayerWeights(
-  player: Player,
-  abilityId: string,
-  rollCount: number,
-  base: DiceWeights,
-): number {
-  const weights =
-    abilityId === "godhand"
-      ? BASE_WEIGHTS
-      : applyAbilityWeights(abilityId, base, {
-          rollCount,
-          abilityUsedThisRound: player.abilityUsedThisRound,
-        });
-  return rollWithWeights(weights);
 }
 
 function canUseGodhand(

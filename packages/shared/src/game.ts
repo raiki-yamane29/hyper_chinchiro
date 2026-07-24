@@ -91,7 +91,7 @@ export const ABILITY_INFO: AbilityInfo[] = [
   { id: "shigoro", name: "シゴロ賽", description: "4・5・6の目しか出なくなります。" },
   { id: "hifumi123", name: "ヒフミ賽", description: "1・2・3の目しか出なくなります。" },
   { id: "gambler", name: "ギャンブラー", description: "自分が絡む精算のポイントの受け渡しが倍になります。" },
-  { id: "godhand", name: "神の一手", description: "1ラウンド1回だけ、サイコロ1個を任意の目に固定できます。" },
+  { id: "godhand", name: "神の一手", description: "1ラウンド1回だけ、サイコロ2個を選択した同じ目に固定できます。" },
   { id: "double_chance", name: "ダブルチャンス", description: "役なし時の振り直し上限が1回増えます。" },
 ];
 
