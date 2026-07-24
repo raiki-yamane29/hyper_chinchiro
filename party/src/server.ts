@@ -12,8 +12,11 @@ import {
 } from "./gameLogic/stateMachine";
 import type { ClientMessage, GameState, RollResult, ServerMessage } from "./types/game";
 
+export { RoomLobby } from "./roomLobby";
+
 type Env = {
   ChinchiroServer: DurableObjectNamespace;
+  RoomLobby: DurableObjectNamespace;
 };
 
 const GRACE_PERIOD_MS = 60_000;
@@ -24,6 +27,9 @@ export class ChinchiroServer extends Server<Env> {
   // 同一ID（同一_pk）の生存接続数。再接続の確立後に旧接続のcloseが遅れて
   // 届いても、接続中のプレイヤーを誤って切断扱いしないための判定に使う
   private connectionCounts = new Map<string, number>();
+  // ルーム作成者が最初のjoinで設定するパスワード。GameStateには含めず
+  // ブロードキャストに乗せない（全員に平文が漏れるのを防ぐ）
+  private roomPassword: string | null = null;
 
   onStart() {
     this.state = createInitialState(this.name);
@@ -44,6 +50,7 @@ export class ChinchiroServer extends Server<Env> {
     if (this.state.players.some((player) => player.id === conn.id)) {
       this.state = setPlayerConnected(this.state, conn.id, true);
       this.broadcastMessage({ type: "state_update", state: this.state });
+      this.ctx.waitUntil(this.syncLobby());
     }
 
     this.send(conn, { type: "state_update", state: this.state });
@@ -61,6 +68,10 @@ export class ChinchiroServer extends Server<Env> {
       return;
     }
 
+    if (parsed.type === "join" && !this.checkJoinPassword(sender, parsed)) {
+      return;
+    }
+
     const previousRoll = this.getLatestRoll(sender.id);
     this.state = applyMessage(this.state, parsed, sender.id);
     const nextRoll = this.getLatestRoll(sender.id);
@@ -70,6 +81,30 @@ export class ChinchiroServer extends Server<Env> {
     }
 
     this.broadcastMessage({ type: "state_update", state: this.state });
+    this.ctx.waitUntil(this.syncLobby());
+  }
+
+  /** 最初の参加者はパスワードを設定し、以降の参加者は一致を検証する。true なら参加を続行してよい */
+  private checkJoinPassword(
+    sender: Connection,
+    parsed: Extract<ClientMessage, { type: "join" }>,
+  ): boolean {
+    const isNewPlayer = !this.state.players.some((player) => player.id === sender.id);
+    if (!isNewPlayer) {
+      return true;
+    }
+
+    if (this.state.players.length === 0) {
+      this.roomPassword = parsed.password?.trim() || null;
+      return true;
+    }
+
+    if (this.roomPassword !== null && parsed.password !== this.roomPassword) {
+      this.send(sender, { type: "error", message: "パスワードが違います" });
+      return false;
+    }
+
+    return true;
   }
 
   onClose(conn: Connection) {
@@ -91,8 +126,37 @@ export class ChinchiroServer extends Server<Env> {
       this.removalTimers.delete(conn.id);
       this.state = removePlayer(this.state, conn.id);
       this.broadcastMessage({ type: "state_update", state: this.state });
+      this.ctx.waitUntil(this.syncLobby());
     }, GRACE_PERIOD_MS);
     this.removalTimers.set(conn.id, timer);
+  }
+
+  /** ルーム登録簿（RoomLobby）へ現在の要約を反映する。失敗してもゲーム進行には影響させない */
+  private async syncLobby() {
+    const stub = this.env.RoomLobby.get(this.env.RoomLobby.idFromName("global"));
+    const endpoint = "http://lobby/rooms";
+
+    try {
+      if (this.state.players.length === 0 || this.state.phase === "game_over") {
+        await stub.fetch(`${endpoint}?roomId=${encodeURIComponent(this.name)}`, {
+          method: "DELETE",
+        });
+        return;
+      }
+
+      await stub.fetch(endpoint, {
+        method: "PUT",
+        body: JSON.stringify({
+          roomId: this.name,
+          hostNickname: this.state.players[0]?.nickname ?? "名無し",
+          hasPassword: this.roomPassword !== null,
+          playerCount: this.state.players.length,
+          phase: this.state.phase,
+        }),
+      });
+    } catch {
+      // ロビー同期の失敗はゲーム進行に影響させない
+    }
   }
 
   private parseClientMessage(message: string): ClientMessage | null {
@@ -129,7 +193,7 @@ export class ChinchiroServer extends Server<Env> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     return (
-      (await routePartykitRequest(request, env)) ??
+      (await routePartykitRequest(request, env, { cors: true })) ??
       new Response("hyper-chinchiro party server", { status: 200 })
     );
   },

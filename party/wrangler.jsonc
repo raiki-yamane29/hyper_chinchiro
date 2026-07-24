@@ -7,6 +7,10 @@
       {
         "name": "ChinchiroServer",
         "class_name": "ChinchiroServer"
+      },
+      {
+        "name": "RoomLobby",
+        "class_name": "RoomLobby"
       }
     ]
   },
@@ -15,6 +19,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChinchiroServer"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["RoomLobby"]
     }
   ],
   "dev": {

@@ -103,6 +103,8 @@ export type ClientMessage =
       abilityId: string;
       abilityMode?: AbilityMode;
       roundsPerPlayer?: number;
+      /** ルーム作成者が最初の参加時に設定する/以降の参加者が入力するパスワード（任意） */
+      password?: string;
     }
   | { type: "ready" }
   | { type: "roll" }

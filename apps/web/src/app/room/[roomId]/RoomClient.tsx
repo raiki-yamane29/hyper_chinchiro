@@ -21,6 +21,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const initialAbility = searchParams.get("abilityId") ?? "trickster";
   const [nickname, setNickname] = useState(initialNickname);
   const [abilityId, setAbilityId] = useState(initialAbility);
+  const [password, setPassword] = useState("");
   const [selectedAbilityMode, setSelectedAbilityMode] =
     useState<AbilityMode>("random_turn");
   const [selectedRoundsPerPlayer, setSelectedRoundsPerPlayer] = useState(1);
@@ -37,6 +38,13 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const effectiveRoundsPerPlayer = roomHasPlayers
     ? (state?.roundsPerPlayer ?? 1)
     : selectedRoundsPerPlayer;
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(`room-password-${roomId}`);
+    if (stored) {
+      setPassword(stored);
+    }
+  }, [roomId]);
 
   const me = useMemo(() => {
     if (!state || !socket) {
@@ -110,6 +118,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
                 abilityId,
                 abilityMode: effectiveAbilityMode,
                 roundsPerPlayer: effectiveRoundsPerPlayer,
+                password,
               });
             }}
           >
@@ -129,6 +138,16 @@ export function RoomClient({ roomId }: RoomClientProps) {
                   required
                   value={nickname}
                   onChange={(event) => setNickname(event.target.value)}
+                />
+              </label>
+              <label className="grid content-start gap-2 text-sm font-medium">
+                パスワード（設定されている場合のみ）
+                <input
+                  className="h-11 border border-stone-300 px-3 text-base outline-none focus:border-red-700"
+                  placeholder="このルームにパスワードがある場合に入力"
+                  type="text"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                 />
               </label>
               <fieldset className="grid content-start gap-2 text-sm font-medium">
